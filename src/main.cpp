@@ -1,5 +1,6 @@
 #include "calculator/Runner.h"
 
+#include <exception>
 #include <iostream>
 #include <string>
 
@@ -10,6 +11,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Runner runner;
-    return runner.run(std::string(argv[1]));
+    try {
+        calculator::Runner runner;
+        return runner.run(std::string(argv[1]));
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
+        return 1;
+    }
 }
