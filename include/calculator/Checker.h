@@ -1,8 +1,12 @@
 #pragma once
 
-#include "Parser.h"
+#include "calculator/Task.h"
+
+namespace calculator {
 
 class Checker {
 public:
-    void check(const CalcData& data) const;
+    void check(const Task& task) const;
 };
+
+} // namespace calculator

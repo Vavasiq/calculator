@@ -1,8 +1,11 @@
 #include "calculator/Logger.h"
 
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+
 #include <memory>
+
+namespace calculator {
 
 struct Logger::Impl {
     std::shared_ptr<spdlog::logger> logger;
@@ -13,7 +16,9 @@ struct Logger::Impl {
     }
 };
 
-Logger::Logger(): impl_(new Impl()) {}
+Logger::Logger(): impl_(std::make_unique<Impl>()) {}
+
+Logger::~Logger() = default;
 
 Logger& Logger::instance() {
     static Logger inst;
@@ -31,3 +36,5 @@ void Logger::warn(const std::string& msg) {
 void Logger::error(const std::string& msg) {
     impl_->logger->error(msg);
 }
+
+} // namespace calculator

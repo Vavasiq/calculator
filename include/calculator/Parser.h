@@ -1,14 +1,14 @@
 #pragma once
 
+#include "calculator/Task.h"
+
 #include <string>
 
-struct CalcData {
-    int a{0};
-    int b{0};
-    char op{'\0'};
-};
+namespace calculator {
 
 class Parser {
 public:
-    CalcData parse(const std::string& json_str) const;
+    Task parse(const std::string& json_str) const;
 };
+
+} // namespace calculator

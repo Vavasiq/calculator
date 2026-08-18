@@ -1,35 +1,31 @@
 #include "calculator/Calculator.h"
 #include "calculator/Logger.h"
+
 #include <mathlib/functions.h>
 
-#include <stdexcept>
 #include <string>
 
-int Calculator::checked(int code, int result) const {
-    switch (code) {
-        case mathlib::MATH_OK:       return result;
-        case mathlib::MATH_OVERFLOW: throw std::overflow_error("Integer overflow");
-        case mathlib::MATH_DIV0:     throw std::domain_error("Division by zero");
-        case mathlib::MATH_DOMAIN:   throw std::domain_error("Value out of domain");
-        default:                     throw std::runtime_error("Unknown math error");
-    }
-}
+namespace calculator {
 
-int Calculator::calculate(const CalcData& data) const {
-    Logger::instance().info(std::string("Calculating, op='") + data.op + "'");
+Task Calculator::calculate(Task task) const {
+    Logger::instance().info(std::string("Calculating, op='") + task.operation + "'");
 
     int result = 0;
-    int code   = mathlib::MATH_DOMAIN;
+    int status = mathlib::MATH_DOMAIN;
 
-    switch (data.op) {
-        case '+': code = mathlib::safe_add(data.a, data.b, result); break;
-        case '-': code = mathlib::safe_sub(data.a, data.b, result); break;
-        case '*': code = mathlib::safe_mul(data.a, data.b, result); break;
-        case '/': code = mathlib::safe_div(data.a, data.b, result); break;
-        case '^': code = mathlib::powi(data.a, data.b, result);     break;
-        case '!': code = mathlib::fact(data.a, result);             break;
-        default:  throw std::invalid_argument(std::string("Unknown operator: '") + data.op + "'");
+    switch (task.operation) {
+        case '+': status = mathlib::safe_add(task.firstValue, task.secondValue, result); break;
+        case '-': status = mathlib::safe_sub(task.firstValue, task.secondValue, result); break;
+        case '*': status = mathlib::safe_mul(task.firstValue, task.secondValue, result); break;
+        case '/': status = mathlib::safe_div(task.firstValue, task.secondValue, result); break;
+        case '^': status = mathlib::powi(task.firstValue, task.secondValue, result); break;
+        case '!': status = mathlib::fact(task.firstValue, result); break;
+        default: break;
     }
 
-    return checked(code, result);
+    task.status = status;
+    task.result = status == mathlib::MATH_OK ? result : 0;
+    return task;
 }
+
+} // namespace calculator

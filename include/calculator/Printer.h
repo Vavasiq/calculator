@@ -1,8 +1,12 @@
 #pragma once
 
-#include "Parser.h"
+#include "calculator/Task.h"
+
+namespace calculator {
 
 class Printer {
 public:
-    void printResult(int result) const;
+    void printResult(const Task& task) const;
 };
+
+} // namespace calculator

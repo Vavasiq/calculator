@@ -5,7 +5,9 @@
 #include <stdexcept>
 #include <string>
 
-CalcData Parser::parse(const std::string& json_str) const {
+namespace calculator {
+
+Task Parser::parse(const std::string& json_str) const {
     Logger::instance().info("Parsing input: " + json_str);
 
     nlohmann::json j;
@@ -18,7 +20,7 @@ CalcData Parser::parse(const std::string& json_str) const {
     if (!j.contains("op") || !j["op"].is_string()) {
         throw std::invalid_argument("Missing or invalid field: 'op'");
     }
-    std::string op_str = j["op"].get<std::string>();
+    const std::string op_str = j["op"].get<std::string>();
     if (op_str.size() != 1) {
         throw std::invalid_argument("Field 'op' must be a single character");
     }
@@ -27,17 +29,18 @@ CalcData Parser::parse(const std::string& json_str) const {
         throw std::invalid_argument("Missing or invalid field: 'a'");
     }
 
-    CalcData data;
-    data.op  = op_str[0];
-    data.a   = j["a"].get<int>();
+    Task task;
+    task.operation = op_str[0];
+    task.firstValue = j["a"].get<int>();
 
-    if (data.op != '!') {
+    if (task.operation != '!') {
         if (!j.contains("b") || !j["b"].is_number_integer()) {
             throw std::invalid_argument("Missing or invalid field: 'b'");
+        }
+        task.secondValue = j["b"].get<int>();
     }
 
-        data.b = j["b"].get<int>();
-    }
-
-    return data;
+    return task;
 }
+
+} // namespace calculator
