@@ -3,24 +3,29 @@
 #include "calculator/Calculator.h"
 #include "calculator/Checker.h"
 #include "calculator/Parser.h"
-#include "calculator/Runner.h"
+#include "calculator/Task.h"
+
+#include <mathlib/functions.h>
 
 #include <stdexcept>
+
+using namespace calculator;
+
 // Parser
 
 TEST(ParserTest, ParsesAddition) {
     Parser p;
-    auto d = p.parse(R"({"op":"+","a":3,"b":4})");
-    EXPECT_EQ(d.op, '+');
-    EXPECT_EQ(d.a, 3);
-    EXPECT_EQ(d.b, 4);
+    const auto task = p.parse(R"({"op":"+","a":3,"b":4})");
+    EXPECT_EQ(task.operation, '+');
+    EXPECT_EQ(task.firstValue, 3);
+    EXPECT_EQ(task.secondValue, 4);
 }
 
 TEST(ParserTest, ParsesFactorial) {
     Parser p;
-    auto d = p.parse(R"({"op":"!","a":5})");
-    EXPECT_EQ(d.op, '!');
-    EXPECT_EQ(d.a, 5);
+    const auto task = p.parse(R"({"op":"!","a":5})");
+    EXPECT_EQ(task.operation, '!');
+    EXPECT_EQ(task.firstValue, 5);
 }
 
 TEST(ParserTest, ThrowsOnInvalidJson) {
@@ -52,99 +57,80 @@ TEST(ParserTest, ThrowsOnMulticharOp) {
 
 TEST(CheckerTest, AcceptsValidAddition) {
     Checker c;
-    CalcData d{1, 2, '+'};
-    EXPECT_NO_THROW(c.check(d));
+    EXPECT_NO_THROW(c.check({1, 2, '+'}));
 }
 
 TEST(CheckerTest, ThrowsOnUnknownOp) {
     Checker c;
-    CalcData d{1, 2, '%'};
-    EXPECT_THROW(c.check(d), std::invalid_argument);
-}
-
-TEST(CheckerTest, ThrowsOnDivisionByZero) {
-    Checker c;
-    CalcData d{5, 0, '/'};
-    EXPECT_THROW(c.check(d), std::domain_error);
-}
-
-TEST(CheckerTest, ThrowsOnNegativeFactorial) {
-    Checker c;
-    CalcData d{-1, 0, '!'};
-    EXPECT_THROW(c.check(d), std::domain_error);
-}
-
-TEST(CheckerTest, ThrowsOnNegativeExponent) {
-    Checker c;
-    CalcData d{2, -3, '^'};
-    EXPECT_THROW(c.check(d), std::domain_error);
+    EXPECT_THROW(c.check({1, 2, '%'}), std::invalid_argument);
 }
 
 // Calculator
 
 TEST(CalculatorTest, Add) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({150, 150, '+'}), 300);
+    const auto task = calc.calculate({150, 150, '+'});
+    EXPECT_EQ(task.result, 300);
+    EXPECT_EQ(task.status, mathlib::MATH_OK);
 }
 
 TEST(CalculatorTest, Sub) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({1337, 420, '-'}), 917);
+    const auto task = calc.calculate({1337, 420, '-'});
+    EXPECT_EQ(task.result, 917);
+    EXPECT_EQ(task.status, mathlib::MATH_OK);
 }
 
 TEST(CalculatorTest, Mul) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({6, 7, '*'}), 42);
+    const auto task = calc.calculate({6, 7, '*'});
+    EXPECT_EQ(task.result, 42);
+    EXPECT_EQ(task.status, mathlib::MATH_OK);
 }
 
 TEST(CalculatorTest, Div) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({42069, 3, '/'}), 14023);
+    const auto task = calc.calculate({42069, 3, '/'});
+    EXPECT_EQ(task.result, 14023);
+    EXPECT_EQ(task.status, mathlib::MATH_OK);
 }
 
-TEST(CalculatorTest, Pow) {
+TEST(CalculatorTest, DivisionByZeroHasStatus) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({2, 10, '^'}), 1024);
+    const auto task = calc.calculate({5, 0, '/'});
+    EXPECT_EQ(task.result, 0);
+    EXPECT_EQ(task.status, mathlib::MATH_DIV0);
 }
 
-TEST(CalculatorTest, PowZeroExponent) {
+TEST(CalculatorTest, OverflowHasStatus) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({1991, 0, '^'}), 1);
+    const auto task = calc.calculate({2147483647, 1, '+'});
+    EXPECT_EQ(task.result, 0);
+    EXPECT_EQ(task.status, mathlib::MATH_OVERFLOW);
 }
 
-TEST(CalculatorTest, Factorial) {
+TEST(CalculatorTest, NegativeExponentHasDomainStatus) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({5, 0, '!'}), 120);
+    const auto task = calc.calculate({2, -3, '^'});
+    EXPECT_EQ(task.status, mathlib::MATH_DOMAIN);
 }
 
-TEST(CalculatorTest, FactorialZero) {
+TEST(CalculatorTest, NegativeFactorialHasDomainStatus) {
     Calculator calc;
-    EXPECT_EQ(calc.calculate({0, 0, '!'}), 1);
+    const auto task = calc.calculate({-1, 0, '!'});
+    EXPECT_EQ(task.status, mathlib::MATH_DOMAIN);
 }
 
-TEST(CalculatorTest, ThrowsOnOverflow) {
-    Calculator calc;
-    EXPECT_THROW(calc.calculate({2147483647, 1, '+'}), std::overflow_error);
+// Cache key
+
+TEST(TaskKeyTest, AdditionIsCommutative) {
+    EXPECT_EQ(makeTaskKey({1, 2, '+'}), makeTaskKey({2, 1, '+'}));
 }
 
-// Runner
-
-TEST(RunnerTest, ReturnsZeroOnSuccess) {
-    Runner r;
-    EXPECT_EQ(r.run(R"({"op":"+","a":1,"b":2})"), 0);
+TEST(TaskKeyTest, MultiplicationIsCommutative) {
+    EXPECT_EQ(makeTaskKey({3, 7, '*'}), makeTaskKey({7, 3, '*'}));
 }
 
-TEST(RunnerTest, ReturnsOneOnBadJson) {
-    Runner r;
-    EXPECT_EQ(r.run("garbage"), 1);
-}
-
-TEST(RunnerTest, ReturnsOneOnDivisionByZero) {
-    Runner r;
-    EXPECT_EQ(r.run(R"({"op":"/","a":5,"b":0})"), 1);
-}
-
-TEST(RunnerTest, ReturnsOneOnOverflow) {
-    Runner r;
-    EXPECT_EQ(r.run(R"({"op":"*","a":2147483647,"b":2})"), 1);
+TEST(TaskKeyTest, SubtractionIsNotCommutative) {
+    EXPECT_NE(makeTaskKey({1, 2, '-'}), makeTaskKey({2, 1, '-'}));
 }

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <string>
+
+namespace calculator {
 
 class Logger {
 public:
@@ -15,8 +18,10 @@ public:
 
 private:
     Logger();
-    ~Logger() = default;
+    ~Logger();
 
     struct Impl;
-    Impl* impl_;
+    std::unique_ptr<Impl> impl_;
 };
+
+} // namespace calculator

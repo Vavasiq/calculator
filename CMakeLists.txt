@@ -7,6 +7,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
+find_package(PostgreSQL REQUIRED)
+
 FetchContent_Declare(
   mathlib
   GIT_REPOSITORY https://github.com/vavasiq/mathlib.git
@@ -43,16 +45,21 @@ add_library(calculator_lib
   src/Calculator.cpp
   src/Printer.cpp
   src/Runner.cpp
+  src/Postgres.cpp
+  src/DataBase.cpp
 )
 
 target_include_directories(calculator_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(calculator_lib PRIVATE
-  mathlib
-  nlohmann_json::nlohmann_json
-  spdlog::spdlog
+target_link_libraries(calculator_lib
+  PRIVATE
+    mathlib
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog
+  PUBLIC
+    PostgreSQL::PostgreSQL
 )
 
 target_compile_options(calculator_lib PRIVATE -Wall -Wextra -Wpedantic)
@@ -66,11 +73,20 @@ enable_testing()
 add_executable(calculator_tests tests/tests.cpp)
 target_link_libraries(calculator_tests PRIVATE
   calculator_lib
+  mathlib
   GTest::gtest_main
 )
 
 include(GoogleTest)
 gtest_discover_tests(calculator_tests)
+
+# прогон тестов под valgrind
+find_program(VALGRIND_EXE valgrind)
+if(VALGRIND_EXE)
+  add_test(NAME memcheck
+    COMMAND ${VALGRIND_EXE} --leak-check=full --error-exitcode=1
+            $<TARGET_FILE:calculator_tests>)
+endif()
 
 find_program(CLANG_FORMAT_EXE NAMES clang-format)
 if(CLANG_FORMAT_EXE)
