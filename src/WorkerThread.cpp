@@ -3,7 +3,6 @@
 #include "calculator/Runner.h"
 
 #include <exception>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -48,8 +47,9 @@ void WorkerThread::run() {
 
         Logger::instance().info("Database connection closed");
     } catch (const std::exception& e) {
+        // Только логгер: он и так пишет в stdout, и под systemd второй вывод в stderr
+        // давал бы в журнале ту же ошибку дважды.
         Logger::instance().error(std::string("Worker failed: ") + e.what());
-        std::cerr << "Error: " << e.what() << '\n';
         exitCode_ = 1;
         stopFlag_.requestStop(StopReason::Error);
     } catch (...) {

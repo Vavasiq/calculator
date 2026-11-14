@@ -33,6 +33,12 @@ DataBase::~DataBase() {
 void DataBase::connect() {
     Logger::instance().info("Connecting to PostgreSQL");
     connection_.connect(connectionString());
+
+    // NOTICE от сервера (например, "relation already exists, skipping" на CREATE TABLE IF NOT EXISTS)
+    // libpq печатает в stderr, а под systemd это строка в журнале при каждом старте.
+    // WARNING и ERROR по-прежнему приходят.
+    ensureCommandSucceeded(connection_.execute("SET client_min_messages TO WARNING"));
+
     createTable();
 }
 

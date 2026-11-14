@@ -84,8 +84,10 @@ stdout и stderr по умолчанию уходят в журнал, поэт�
 
 Системный пользователь без входа в систему:
 ```bash
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin calculator
+sudo useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin calculator
 ```
+`--home-dir /nonexistent` — так в Debian принято для системных пользователей. Без этого флага домашним каталогом записывается `/home/calculator`, которого нет. С `/nonexistent` libpq при поиске `~/.postgresql/` просто получает «файла нет» и не упирается в закрытый `/home` (см. `ProtectHome` в разделе 1).
+
 В задаче 2 он создаётся вручную, в задаче 4 его создаст `postinst` deb-пакета. Это пользователь ОС, к роли PostgreSQL `calculator` он отношения не имеет: подключение к БД идёт по TCP с паролем из конфига.
 
 ## 4. Изменения по файлам
@@ -145,7 +147,7 @@ sudo useradd --system --no-create-home --shell /usr/sbin/nologin calculator
 ### 0. Подготовка (один раз)
 ```bash
 systemctl cat postgresql@16-main | grep -E 'Before|PartOf'   # есть ли Before=postgresql.service (раздел 1)
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin calculator
+sudo useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin calculator
 cmake -S . -B build && cmake --build build -j && ctest --test-dir build
 sudo cmake --install build                                   # префикс /usr/local
 sudo chown root:calculator /etc/calculator/calculator.json
