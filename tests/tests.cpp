@@ -12,10 +12,28 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 
 using namespace calculator;
+
+namespace {
+
+// Busy-цикл с ограничением по времени вместо sleep: true, если условие выполнилось до дедлайна.
+template <typename Predicate>
+bool waitUntil(Predicate predicate, std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (!predicate()) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return false;
+        }
+        std::this_thread::yield();
+    }
+    return true;
+}
+
+} // namespace
 
 // Parser
 
@@ -193,6 +211,138 @@ TEST(StopFlagTest, FirstReasonWins) {
 
     EXPECT_EQ(flag.reason(), StopReason::Signal);
     EXPECT_EQ(flag.signalNumber(), SIGTERM);
+}
+
+// StopFlag: подписка на остановку
+
+TEST(StopFlagTest, OnStopCalledOnRequest) {
+    StopFlag flag;
+    int calls = 0;
+    auto subscription = flag.onStop([&] { ++calls; });
+
+    EXPECT_EQ(calls, 0);
+    flag.requestStop(StopReason::Signal, SIGTERM);
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(StopFlagTest, OnStopAfterRequestCalledImmediately) {
+    StopFlag flag;
+    flag.requestStop(StopReason::Signal, SIGTERM);
+
+    bool called = false;
+    auto subscription = flag.onStop([&] { called = true; });
+    EXPECT_TRUE(called); // вызван внутри onStop, а не сохранён «на потом»
+}
+
+TEST(StopFlagTest, CallbackCalledExactlyOnce) {
+    StopFlag flag;
+    std::atomic<int> calls{0};
+    auto subscription = flag.onStop([&] { ++calls; });
+
+    // Два потока одновременно запрашивают остановку (как поток сигналов и рабочий поток
+    // при ошибке): колбэк всё равно вызывается один раз.
+    std::thread first([&] { flag.requestStop(StopReason::Signal, SIGTERM); });
+    std::thread second([&] { flag.requestStop(StopReason::Error); });
+    first.join();
+    second.join();
+    flag.requestStop(StopReason::Error);
+
+    EXPECT_EQ(calls.load(), 1);
+}
+
+TEST(StopFlagTest, CallbackRunsOutsideLock) {
+    // Колбэк обращается к StopFlag. Если бы он вызывался под мьютексом, это была бы
+    // повторная блокировка std::mutex: зависание (его оборвёт TIMEOUT ctest) или отчёт TSan.
+    StopFlag flag;
+    bool seenFromRequest = false;
+    auto subscription = flag.onStop([&] { seenFromRequest = flag.isStopRequested(); });
+    flag.requestStop(StopReason::Signal, SIGTERM);
+    EXPECT_TRUE(seenFromRequest);
+
+    // То же для немедленного вызова из onStop.
+    StopReason seenFromSubscribe = StopReason::None;
+    auto late = flag.onStop([&] { seenFromSubscribe = flag.reason(); });
+    EXPECT_EQ(seenFromSubscribe, StopReason::Signal);
+}
+
+TEST(StopFlagTest, UnsubscribedCallbackNotCalled) {
+    StopFlag flag;
+    bool called = false;
+    {
+        auto subscription = flag.onStop([&] { called = true; });
+    } // отписка в деструкторе
+    flag.requestStop(StopReason::Signal, SIGTERM);
+    EXPECT_FALSE(called);
+}
+
+TEST(StopFlagTest, MovedSubscriptionKeepsCallback) {
+    StopFlag flag;
+    bool called = false;
+    std::optional<StopFlag::Subscription> holder;
+    {
+        auto subscription = flag.onStop([&] { called = true; });
+        holder.emplace(std::move(subscription));
+    } // перемещённый объект уничтожен — подписка должна остаться у holder
+    flag.requestStop(StopReason::Signal, SIGTERM);
+    EXPECT_TRUE(called);
+}
+
+TEST(StopFlagTest, CallbackCanUnsubscribeItself) {
+    // Колбэк уничтожает собственную подписку. Деструктор в том же потоке не должен ждать
+    // сам себя — иначе зависание (его оборвёт TIMEOUT ctest).
+    StopFlag flag;
+    bool called = false;
+    std::optional<StopFlag::Subscription> subscription;
+    subscription.emplace(flag.onStop([&] {
+        called = true;
+        subscription.reset();
+    }));
+    flag.requestStop(StopReason::Signal, SIGTERM);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(subscription.has_value());
+}
+
+TEST(StopFlagTest, SubscriptionDestructorWaitsForRunningCallback) {
+    // Сценарий из раздела 5 плана: поток сигналов выполняет колбэк, а рабочий поток в это
+    // время уничтожает подписку (и затем io_context). Деструктор обязан дождаться колбэка.
+    using std::chrono::milliseconds;
+
+    StopFlag flag;
+    std::atomic<bool> entered{false};
+    std::atomic<bool> release{false};
+    std::atomic<bool> callbackFinished{false};
+    std::atomic<bool> destructorReturned{false};
+    bool finishedWhenDestructorReturned = false; // пишет destroyer, читаем после join
+
+    std::optional<StopFlag::Subscription> subscription;
+    subscription.emplace(flag.onStop([&] {
+        entered = true;
+        while (!release) {
+            std::this_thread::yield();
+        }
+        callbackFinished = true;
+    }));
+
+    std::thread stopper([&] { flag.requestStop(StopReason::Signal, SIGTERM); });
+    const bool callbackEntered = waitUntil([&] { return entered.load(); }, milliseconds(5000));
+
+    std::thread destroyer([&] {
+        subscription.reset();
+        finishedWhenDestructorReturned = callbackFinished.load();
+        destructorReturned = true;
+    });
+
+    // Окно с ограничением по времени: пока колбэк не отпущен, деструктор не должен вернуться.
+    // Корректная реализация проходит всегда; без ожидания деструктор вернётся почти сразу.
+    const bool returnedTooEarly = waitUntil([&] { return destructorReturned.load(); }, milliseconds(100));
+
+    release = true; // отпускаем колбэк в любом случае, чтобы потоки завершились
+    destroyer.join();
+    stopper.join();
+
+    ASSERT_TRUE(callbackEntered) << "callback was never invoked";
+    EXPECT_FALSE(returnedTooEarly) << "Subscription destructor returned while callback was running";
+    EXPECT_TRUE(finishedWhenDestructorReturned);
 }
 
 // Config

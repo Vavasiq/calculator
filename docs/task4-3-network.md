@@ -291,11 +291,12 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 **`StopFlag`, подписка** (`tests.cpp`):
 - `OnStopCalledOnRequest` — колбэк вызван после `requestStop`.
 - `OnStopAfterRequestCalledImmediately` — подписка после `requestStop`: колбэк вызван внутри `onStop`.
-- `CallbackCalledExactlyOnce` — два `requestStop` дают один вызов.
-- `CallbackRunsOutsideLock` — колбэк вызывает `flag.isStopRequested()`. Если колбэк вызывается под мьютексом, тест зависнет, и его оборвёт `TIMEOUT` ctest.
+- `CallbackCalledExactlyOnce` — два потока одновременно вызывают `requestStop`, плюс ещё один повторный вызов: колбэк вызван один раз.
+- `CallbackRunsOutsideLock` — колбэк вызывает `flag.isStopRequested()`, и при вызове из `requestStop`, и при немедленном вызове из `onStop`. Если колбэк вызывается под мьютексом, тест зависнет, и его оборвёт `TIMEOUT` ctest.
 - `UnsubscribedCallbackNotCalled` — `Subscription` уничтожена до `requestStop`, вызова нет.
-
-Ожидание деструктора `Subscription`, пока колбэк выполняется в другом потоке, без sleep детерминированно не проверить. Его покрывают TSan и ревью кода.
+- `MovedSubscriptionKeepsCallback` — после перемещения подписка остаётся у нового владельца, уничтожение перемещённого объекта её не снимает.
+- `CallbackCanUnsubscribeItself` — колбэк уничтожает собственную подписку. Деструктор в том же потоке не ждёт сам себя.
+- `SubscriptionDestructorWaitsForRunningCallback` — колбэк выполняется в одном потоке и держится, пока тест его не отпустит. Другой поток в это время уничтожает подписку. Busy-цикл с окном 100 мс проверяет, что деструктор не вернулся раньше колбэка. Корректная реализация проходит всегда, а версия без ожидания падает: проверено на изменённой копии `StopFlag.cpp`, 20 падений из 20.
 
 **`Protocol`:** `SerializesSuccess`, `SerializesError` (поля и значения), `StatusMessages`.
 
@@ -370,7 +371,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 ### Шаг 1. Подписка в `StopFlag`
 - **Что:** `onStop` и `Subscription` по разделу 5. Плюс `TIMEOUT` для ctest: он нужен уже здесь, потому что `CallbackRunsOutsideLock` при ошибке зависает.
 - **Файлы:** `StopFlag.h`/`.cpp`, `CMakeLists.txt` (`TIMEOUT`).
-- **Тесты:** пять тестов подписки `StopFlag` (раздел 11).
+- **Тесты:** восемь тестов подписки `StopFlag` (раздел 11).
 - **Готово, когда:** тесты зелёные, в TSan-сборке нет предупреждений. Поведение сервиса не меняется: подписку пока никто не использует.
 
 ### Шаг 2. `Protocol` и `Runner`

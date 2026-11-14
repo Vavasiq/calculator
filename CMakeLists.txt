@@ -108,7 +108,8 @@ target_link_libraries(calculator_tests PRIVATE
 )
 
 include(GoogleTest)
-gtest_discover_tests(calculator_tests)
+# TIMEOUT: зависший тест (например, взаимная блокировка) падает, а не вешает ctest.
+gtest_discover_tests(calculator_tests PROPERTIES TIMEOUT 60)
 
 # прогон тестов под valgrind (несовместим с TSan, поэтому только в обычной сборке)
 find_program(VALGRIND_EXE valgrind)
@@ -116,6 +117,8 @@ if(VALGRIND_EXE AND NOT ENABLE_TSAN)
   add_test(NAME memcheck
     COMMAND ${VALGRIND_EXE} --leak-check=full --error-exitcode=1
             $<TARGET_FILE:calculator_tests>)
+  # весь набор тестов под valgrind в 10–50 раз медленнее
+  set_tests_properties(memcheck PROPERTIES TIMEOUT 300)
 endif()
 
 find_program(CLANG_FORMAT_EXE NAMES clang-format)
