@@ -5,8 +5,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# ThreadSanitizer. Глобальные опции задаются ДО FetchContent_MakeAvailable,
+# чтобы инструментировались и зависимости (mathlib, spdlog, gtest).
+# Собирать в отдельной директории: cmake -S . -B build-tsan -DENABLE_TSAN=ON
+option(ENABLE_TSAN "Build with ThreadSanitizer" OFF)
+if(ENABLE_TSAN)
+  add_compile_options(-fsanitize=thread -g -O1)
+  add_link_options(-fsanitize=thread)
+endif()
+
 include(FetchContent)
 
+find_package(Threads REQUIRED)
 find_package(PostgreSQL REQUIRED)
 
 FetchContent_Declare(
@@ -47,6 +57,9 @@ add_library(calculator_lib
   src/Runner.cpp
   src/Postgres.cpp
   src/DataBase.cpp
+  src/StopFlag.cpp
+  src/SignalThread.cpp
+  src/WorkerThread.cpp
 )
 
 target_include_directories(calculator_lib PUBLIC
@@ -60,6 +73,7 @@ target_link_libraries(calculator_lib
     spdlog::spdlog
   PUBLIC
     PostgreSQL::PostgreSQL
+    Threads::Threads
 )
 
 target_compile_options(calculator_lib PRIVATE -Wall -Wextra -Wpedantic)
@@ -80,9 +94,9 @@ target_link_libraries(calculator_tests PRIVATE
 include(GoogleTest)
 gtest_discover_tests(calculator_tests)
 
-# прогон тестов под valgrind
+# прогон тестов под valgrind (несовместим с TSan, поэтому только в обычной сборке)
 find_program(VALGRIND_EXE valgrind)
-if(VALGRIND_EXE)
+if(VALGRIND_EXE AND NOT ENABLE_TSAN)
   add_test(NAME memcheck
     COMMAND ${VALGRIND_EXE} --leak-check=full --error-exitcode=1
             $<TARGET_FILE:calculator_tests>)

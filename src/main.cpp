@@ -1,44 +1,61 @@
-#include "calculator/Runner.h"
+#include "calculator/Logger.h"
+#include "calculator/SignalThread.h"
+#include "calculator/StopFlag.h"
+#include "calculator/WorkerThread.h"
 
-#include <csignal>
 #include <exception>
 #include <iostream>
+#include <optional>
 #include <string>
+#include <utility>
 
 namespace {
 
-// Ждём SIGINT/SIGTERM, чтобы по Ctrl+C выйти штатным возвратом из main
-// и дать деструкторам Runner/DataBase закрыть соединение (PQfinish).
-// Сигналы сначала блокируются, потом принимаются вручную через sigwait:
-// заблокированный сигнал не теряется, а ждёт разбора, поэтому гонки между
-// проверкой флага и уходом в ожидание здесь нет (в отличие от pause()).
-void waitForTerminationSignal() {
-    sigset_t mask;
-    sigemptyset(&mask);
-    sigaddset(&mask, SIGINT);
-    sigaddset(&mask, SIGTERM);
-    sigprocmask(SIG_BLOCK, &mask, nullptr);
-
-    int signalNumber = 0;
-    sigwait(&mask, &signalNumber);
+void logStopReason(const calculator::StopFlag& stopFlag) {
+    switch (stopFlag.reason()) {
+        case calculator::StopReason::Signal:
+            calculator::Logger::instance().info("Stopped by signal " + std::to_string(stopFlag.signalNumber()));
+            break;
+        case calculator::StopReason::Error: calculator::Logger::instance().error("Stopped due to an error"); break;
+        case calculator::StopReason::None: break;
+    }
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "Usage: calculator '<json>'\n"
-                  << "Example: calculator '{\"op\":\"+\",\"a\":3,\"b\":4}'\n";
+    // До создания любых потоков: они унаследуют маску, и SIGINT/SIGTERM
+    // получит только sigwait в потоке сигналов.
+    try {
+        calculator::SignalThread::blockTerminationSignals();
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
 
+    if (argc > 2) {
+        std::cerr << "Usage: calculator ['<json>']\n"
+                  << "Example: calculator '{\"op\":\"+\",\"a\":3,\"b\":4}'\n"
+                  << "Without arguments runs as a service until SIGINT/SIGTERM.\n";
+        return 1;
+    }
+
+    std::optional<std::string> initialTask;
+    if (argc == 2) {
+        initialTask = argv[1];
+    }
+
     try {
-        calculator::Runner runner;
-        const int status = runner.run(std::string(argv[1]));
+        calculator::StopFlag stopFlag;
+        calculator::SignalThread signals(stopFlag);
+        calculator::WorkerThread worker(stopFlag, std::move(initialTask));
 
-        waitForTerminationSignal();
+        // Явный порядок, не зависящий от порядка деструкторов.
+        worker.join();
+        signals.stop();
 
-        return status;
+        logStopReason(stopFlag);
+        return worker.exitCode();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;

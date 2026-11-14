@@ -12,7 +12,8 @@ struct Logger::Impl {
 
     Impl() {
         logger = spdlog::stdout_color_mt("calculator");
-        logger->set_pattern("[%H:%M:%S] [%^%l%$] %v");
+        // [%t] — id потока: видно, какой поток что делает (сигналы / рабочий / main)
+        logger->set_pattern("[%H:%M:%S] [%t] [%^%l%$] %v");
     }
 };
 
