@@ -225,7 +225,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 - **`include/calculator/TaskStorage.h`** — интерфейс `getRecord`/`writeRecord`, только заголовок.
 - **`include/calculator/Server.h`, `src/Server.cpp`** — класс `Server` (акцептор, сокет текущего клиента, буфер, строка ответа, ссылка на `Runner`) и функция `runServer` (раздел 6).
 - **`include/calculator/ServerConfig.h`** — `ServerConfig` отдельным заголовком. Так `Server.h` не тянет `Config.h` → `DataBase.h` → libpq. `Config.h` его подключает.
-- **`tests/TestClient.h`, `tests/TestClient.cpp`, `tests/TestServer.h`, `tests/InMemoryStorage.h`, `tests/network_tests.cpp`** — вспомогательные классы, сетевые тесты и интеграционный тест с настоящей БД (раздел 11).
+- **`tests/TestClient.h`, `tests/TestClient.cpp`, `tests/TestServer.h`, `tests/InMemoryStorage.h`, `tests/WaitUntil.h`, `tests/network_tests.cpp`** — вспомогательные классы, сетевые тесты и интеграционный тест с настоящей БД (раздел 11). `WaitUntil.h` — общий busy-цикл с таймаутом для `tests.cpp` и `network_tests.cpp`.
 
 ### Изменяемые файлы
 
@@ -324,8 +324,8 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 | `PipelinedRequests` | Две строки одним `write` → два ответа в правильном порядке |
 | `ServesNextClientAfterDisconnect` | Клиент 1 получил ответ и отключился, клиент 2 получает свой ответ |
 | `TooLongRequestClosesConnection` | 5000 байт без `\n` → ответ `-1`, затем сервер закрыл соединение (EOF) |
-| `SurvivesClientDisconnectBeforeResponse` | Клиент отправил запрос и сразу закрыл сокет. Процесс жив (проверка `SIGPIPE`), следующий клиент получает правильный результат |
-| `StopsOnStopRequest` | `requestStop` → поток сервера завершился (`waitUntil` с таймаутом), новое подключение отклоняется |
+| `SurvivesClientDisconnectBeforeResponse` | Клиент отправил 50 запросов одним пакетом и сразу закрыл сокет, так что сервер пишет ответы в закрытое соединение. Процесс жив (проверка `SIGPIPE`), следующий клиент получает правильный результат |
+| `StopsOnStopRequest` | `requestStop` при активной сессии → поток сервера завершился (`waitUntil` с таймаутом), подключённый клиент видит закрытие соединения, новое подключение отклоняется |
 | `StopBeforeRunIsNotLost` | `requestStop` до старта `TestServer` → `runServer` сразу возвращается. Сквозная проверка правила «подписка после остановки вызывается сразу» |
 | `HeavyInputsAnsweredOverNetwork` (шаг 5) | `{"op":"!","a":100000000}` → `status 1` (переполнение) в пределах таймаута. Процесс жив, следующий запрос обслуживается |
 
@@ -353,6 +353,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 - **Данные, общие для потоков, в сервисе:** `StopFlag` (мьютекс), `io_context::stop()` (потокобезопасен), `Logger` (spdlog `_mt`). Всё остальное живёт в рабочем потоке (раздел 3).
 - **Синхронизацию через сокет TSan не видит.** Если тест получил ответ по TCP, для TSan это не happens-before с потоком сервера. Поэтому всё, что тест читает из записанного сервером, должно быть атомиком (порт, счётчик записей) или читаться после `join` (исключение из потока сервера). Это главный источник ложных отчётов, его закладываем сразу.
 - **Asio header-only**, поэтому инструментируется вместе с нашим кодом (раздел 2).
+- **Предупреждение `-Wtsan` от GCC** при сборке кода с Asio: TSan не моделирует `std::atomic_thread_fence`, который используется в заголовках Asio. Это предупреждение компилятора, а не отчёт о гонке. Из-за непонятого барьера TSan может дать ложное срабатывание, но не пропустит настоящую гонку. Наш код обращается к `io_context` из другого потока только через `stop()`, а он внутри защищён мьютексом, который TSan видит. Поэтому в TSan-сборке для GCC добавлен `-Wno-tsan` с комментарием в `CMakeLists.txt`.
 - **Где прогоняется:**
   - `ctest --test-dir build-tsan`, где сетевые тесты гоняют потоки теста и сервера;
   - ручной запуск `build-tsan/calculator` с запросами через `nc` и `SIGTERM` (раздел 15).
@@ -406,7 +407,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 
 ### Шаг 4. Сетевые тесты
 - **Что:** `TestClient`, `TestServer`, `waitUntil`, сетевые тесты из таблицы раздела 11 и интеграционный тест с настоящей БД.
-- **Файлы:** `tests/TestClient.h`/`.cpp`, `tests/TestServer.h`, `tests/network_tests.cpp`, `CMakeLists.txt` (тестовые исходники, `nlohmann_json` для тестов).
+- **Файлы:** `tests/TestClient.h`/`.cpp`, `tests/TestServer.h`, `tests/WaitUntil.h`, `tests/network_tests.cpp`, `CMakeLists.txt` (тестовые исходники, `nlohmann_json` для тестов, `-Wno-tsan` для GCC в TSan-сборке).
 - **Готово, когда:**
   - тесты зелёные в обеих сборках, в TSan-сборке нет предупреждений;
   - `memcheck` проходит;

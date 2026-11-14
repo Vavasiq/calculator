@@ -10,6 +10,7 @@
 #include "calculator/Task.h"
 
 #include "InMemoryStorage.h"
+#include "WaitUntil.h"
 
 #include <mathlib/functions.h>
 
@@ -23,23 +24,7 @@
 using namespace calculator;
 using calculator::test::FailingStorage;
 using calculator::test::InMemoryStorage;
-
-namespace {
-
-// Busy-цикл с ограничением по времени вместо sleep: true, если условие выполнилось до дедлайна.
-template <typename Predicate>
-bool waitUntil(Predicate predicate, std::chrono::milliseconds timeout) {
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
-    while (!predicate()) {
-        if (std::chrono::steady_clock::now() >= deadline) {
-            return false;
-        }
-        std::this_thread::yield();
-    }
-    return true;
-}
-
-} // namespace
+using calculator::test::waitUntil;
 
 // Parser
 

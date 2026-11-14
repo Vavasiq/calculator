@@ -25,6 +25,13 @@ option(ENABLE_TSAN "Build with ThreadSanitizer" OFF)
 if(ENABLE_TSAN)
   add_compile_options(-fsanitize=thread -g -O1)
   add_link_options(-fsanitize=thread)
+  # GCC 12+ предупреждает (-Wtsan), что TSan не моделирует std::atomic_thread_fence, который
+  # используют заголовки Asio. Это не отчёт о гонке: из-за непонятого барьера TSan может дать
+  # ложное срабатывание, но не пропустить настоящую гонку. Наш код трогает io_context из другого
+  # потока только через stop(), а он защищён мьютексом, который TSan видит. Clang флаг не знает.
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-tsan)
+  endif()
 endif()
 
 include(FetchContent)
@@ -110,10 +117,15 @@ target_compile_options(calculator PRIVATE -Wall -Wextra -Wpedantic)
 
 enable_testing()
 
-add_executable(calculator_tests tests/tests.cpp)
+add_executable(calculator_tests
+  tests/tests.cpp
+  tests/network_tests.cpp
+  tests/TestClient.cpp
+)
 target_link_libraries(calculator_tests PRIVATE
   calculator_lib
   mathlib
+  nlohmann_json::nlohmann_json # TestClient разбирает JSON-ответы
   GTest::gtest_main
 )
 
