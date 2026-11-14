@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(calculator LANGUAGES CXX)
+project(calculator VERSION 1.0.0 LANGUAGES CXX) # VERSION — версия deb-пакета
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -190,3 +190,6 @@ install(CODE "
       FILES \"${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/calculator.json\")
   endif()
 ")
+
+# --- deb-пакет (план: docs/task4-4-deb.md). После всех install(): CPack берёт их правила. ---
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Packaging.cmake)
