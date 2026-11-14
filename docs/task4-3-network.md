@@ -114,6 +114,7 @@ sudo apt install libboost-dev      # Ubuntu 24.04 → Boost 1.83, Ubuntu 22.04 �
 - **`\r` в конце строки отбрасывается.** Это для совместимости с `nc` и telnet.
 - **Лимит строки — 4096 байт с `\n`.** При превышении сервер отвечает `-1` `"Request too long"` и закрывает соединение: найти начало следующего запроса в потоке уже нельзя.
 - **Пустая строка или мусор** дают ответ `-1`, соединение остаётся открытым.
+- **Невалидный UTF-8.** Текст ошибки разбора от nlohmann включает фрагмент присланного ввода (`last read: '...'`). Обычный `dump()` на невалидном UTF-8 бросает `type_error.316`, и один байт `\xff` от клиента уронил бы сервер. Поэтому ответ сериализуется с `error_handler_t::replace`: такие байты заменяются на U+FFFD.
 - **Клиент закрыл соединение (EOF)** — сервер принимает следующего клиента.
 - **Внутренняя ошибка** (например, БД отвалилась при `writeRecord`) — подробности пишутся в лог, клиент получает `-2` без деталей. Сервис продолжает работать: ответы из кеша по-прежнему отдаются.
 
@@ -298,13 +299,15 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 - `CallbackCanUnsubscribeItself` — колбэк уничтожает собственную подписку. Деструктор в том же потоке не ждёт сам себя.
 - `SubscriptionDestructorWaitsForRunningCallback` — колбэк выполняется в одном потоке и держится, пока тест его не отпустит. Другой поток в это время уничтожает подписку. Busy-цикл с окном 100 мс проверяет, что деструктор не вернулся раньше колбэка. Корректная реализация проходит всегда, а версия без ожидания падает: проверено на изменённой копии `StopFlag.cpp`, 20 падений из 20.
 
-**`Protocol`:** `SerializesSuccess`, `SerializesError` (поля и значения), `StatusMessages`.
+**`Protocol`:** `SerializesSuccess`, `SerializesError` (поля и значения), `InvalidUtf8InErrorDoesNotThrow`, `StatusMessages`.
 
 **`Runner`** (без сети, `InMemoryStorage`):
 - `ReturnsResult`;
 - `CommutativeRequestHitsCache` — после `2+3` и `3+2` счётчик записей равен `1`;
 - `InvalidJsonGivesInvalidRequest` — `-1`;
-- `DivisionByZeroGivesMathStatus` — `2`, текст ошибки.
+- `DivisionByZeroGivesMathStatus` — `2`, текст ошибки;
+- `InvalidUtf8RequestGivesSerializableResponse` — запрос с сырым байтом `\xff` даёт `-1`, ответ сериализуется без исключения;
+- `StorageFailureGivesInternalError` — у хранилища ломается запись (`FailingStorage`), ответ `-2` без подробностей о БД.
 
 **`Config`:** `ParsesServerSection`, `ServerSectionDefaults`, `ThrowsOnInvalidAddress`.
 

@@ -1,8 +1,10 @@
 #include "calculator/WorkerThread.h"
 #include "calculator/Logger.h"
+#include "calculator/Protocol.h"
 #include "calculator/Runner.h"
 
 #include <exception>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -34,16 +36,23 @@ void WorkerThread::run() {
     try {
         {
             // После старта dbConfig_ трогает только этот поток, поэтому его можно переместить.
-            Runner runner(std::move(dbConfig_));
+            DataBase dataBase(std::move(dbConfig_));
+            dataBase.connect();
+            dataBase.warmUpCache();
+
+            Runner runner(dataBase); // объявлен после dataBase -> уничтожается раньше неё
 
             if (initialTask_) {
-                runner.run(*initialTask_);
+                // ВРЕМЕННО (шаг 2 плана docs/task4-3-network.md): ответ на задание из командной
+                // строки выводится в stdout. На шаге 3 задания будут приходить по сети,
+                // и этот вывод уберётся вместе с аргументом командной строки.
+                std::cout << serializeResponse(runner.handle(*initialTask_)) << std::endl;
             }
 
             Logger::instance().info("Worker is waiting for stop request");
             stopFlag_.waitForStop();
             Logger::instance().info("Worker is shutting down");
-        } // ~Runner -> ~DataBase -> PQfinish
+        } // ~Runner, затем ~DataBase -> PQfinish
 
         Logger::instance().info("Database connection closed");
     } catch (const std::exception& e) {

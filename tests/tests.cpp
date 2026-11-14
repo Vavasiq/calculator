@@ -4,8 +4,12 @@
 #include "calculator/Checker.h"
 #include "calculator/Config.h"
 #include "calculator/Parser.h"
+#include "calculator/Protocol.h"
+#include "calculator/Runner.h"
 #include "calculator/StopFlag.h"
 #include "calculator/Task.h"
+
+#include "InMemoryStorage.h"
 
 #include <mathlib/functions.h>
 
@@ -17,6 +21,8 @@
 #include <thread>
 
 using namespace calculator;
+using calculator::test::FailingStorage;
+using calculator::test::InMemoryStorage;
 
 namespace {
 
@@ -397,4 +403,116 @@ TEST(ConfigTest, ThrowsOnPortOutOfRange) {
 TEST(ConfigTest, ThrowsOnInvalidJson) {
     EXPECT_THROW(parseConfig("{not json"), std::invalid_argument);
     EXPECT_THROW(parseConfig(""), std::invalid_argument);
+}
+
+// Protocol
+
+TEST(ProtocolTest, SerializesSuccess) {
+    // Без поля error; ключи nlohmann выводит по алфавиту.
+    EXPECT_EQ(serializeResponse({0, 5, ""}), R"({"result":5,"status":0})");
+    EXPECT_EQ(serializeResponse({0, -7, "ignored"}), R"({"result":-7,"status":0})");
+}
+
+TEST(ProtocolTest, SerializesError) {
+    EXPECT_EQ(serializeResponse({mathlib::MATH_DIV0, 0, "Division by zero"}),
+              R"({"error":"Division by zero","result":0,"status":2})");
+    EXPECT_EQ(serializeResponse({kStatusInvalidRequest, 0, "Missing or invalid field: 'b'"}),
+              R"({"error":"Missing or invalid field: 'b'","result":0,"status":-1})");
+    // Пустой текст ошибки -> подставляется statusMessage.
+    EXPECT_EQ(serializeResponse({kStatusInternalError, 0, ""}),
+              R"({"error":"Internal error","result":0,"status":-2})");
+}
+
+TEST(ProtocolTest, InvalidUtf8InErrorDoesNotThrow) {
+    // Текст ошибки разбора содержит фрагмент ввода клиента — там может быть что угодно.
+    std::string serialized;
+    ASSERT_NO_THROW(serialized = serializeResponse({kStatusInvalidRequest, 0, "last read: '\xff'"}));
+    EXPECT_NE(serialized.find("\xEF\xBF\xBD"), std::string::npos) << serialized; // U+FFFD
+}
+
+TEST(ProtocolTest, StatusMessages) {
+    EXPECT_EQ(statusMessage(mathlib::MATH_OK), "OK");
+    EXPECT_EQ(statusMessage(mathlib::MATH_OVERFLOW), "Integer overflow");
+    EXPECT_EQ(statusMessage(mathlib::MATH_DIV0), "Division by zero");
+    EXPECT_EQ(statusMessage(mathlib::MATH_DOMAIN), "Value out of domain");
+    EXPECT_EQ(statusMessage(kStatusInvalidRequest), "Invalid request");
+    EXPECT_EQ(statusMessage(kStatusInternalError), "Internal error");
+    EXPECT_EQ(statusMessage(42), "Unknown error");
+}
+
+// Runner (без сети и без БД)
+
+TEST(RunnerTest, ReturnsResult) {
+    InMemoryStorage storage;
+    Runner runner(storage);
+
+    const auto response = runner.handle(R"({"op":"+","a":2,"b":3})");
+    EXPECT_EQ(response.status, mathlib::MATH_OK);
+    EXPECT_EQ(response.result, 5);
+    EXPECT_TRUE(response.error.empty());
+
+    EXPECT_EQ(runner.handle(R"({"op":"!","a":5})").result, 120);
+}
+
+TEST(RunnerTest, CommutativeRequestHitsCache) {
+    InMemoryStorage storage;
+    Runner runner(storage);
+
+    EXPECT_EQ(runner.handle(R"({"op":"+","a":2,"b":3})").result, 5);
+    EXPECT_EQ(runner.handle(R"({"op":"+","a":3,"b":2})").result, 5);
+    EXPECT_EQ(storage.writes(), 1); // второй запрос взят из кеша
+
+    // Вычитание не коммутативно: это отдельная запись.
+    EXPECT_EQ(runner.handle(R"({"op":"-","a":3,"b":2})").result, 1);
+    EXPECT_EQ(runner.handle(R"({"op":"-","a":2,"b":3})").result, -1);
+    EXPECT_EQ(storage.writes(), 3);
+}
+
+TEST(RunnerTest, InvalidJsonGivesInvalidRequest) {
+    InMemoryStorage storage;
+    Runner runner(storage);
+
+    for (const char* request : {"not json", "", R"({"op":"+","a":1})", R"({"op":"%","a":1,"b":2})"}) {
+        const auto response = runner.handle(request);
+        EXPECT_EQ(response.status, kStatusInvalidRequest) << request;
+        EXPECT_EQ(response.result, 0) << request;
+        EXPECT_FALSE(response.error.empty()) << request;
+    }
+    EXPECT_EQ(storage.writes(), 0); // некорректные запросы в хранилище не попадают
+}
+
+TEST(RunnerTest, DivisionByZeroGivesMathStatus) {
+    InMemoryStorage storage;
+    Runner runner(storage);
+
+    for (int attempt = 0; attempt < 2; ++attempt) { // второй раз — из кеша
+        const auto response = runner.handle(R"({"op":"/","a":5,"b":0})");
+        EXPECT_EQ(response.status, mathlib::MATH_DIV0);
+        EXPECT_EQ(response.result, 0);
+        EXPECT_EQ(response.error, "Division by zero");
+    }
+    EXPECT_EQ(storage.writes(), 1); // ошибка вычисления тоже сохраняется (статус хранится в БД)
+}
+
+TEST(RunnerTest, InvalidUtf8RequestGivesSerializableResponse) {
+    // Сырой байт 0xFF от клиента попадает в текст ошибки nlohmann ("last read: ...").
+    // Ответ всё равно должен сериализоваться, иначе на шаге 3 это уронило бы сервер.
+    InMemoryStorage storage;
+    Runner runner(storage);
+
+    for (const char* request : {"\xff", "{\"op\":\"\xff\",\"a\":1,\"b\":2}"}) {
+        const auto response = runner.handle(request);
+        EXPECT_EQ(response.status, kStatusInvalidRequest);
+        EXPECT_NO_THROW(serializeResponse(response));
+    }
+}
+
+TEST(RunnerTest, StorageFailureGivesInternalError) {
+    FailingStorage storage;
+    Runner runner(storage);
+
+    const auto response = runner.handle(R"({"op":"*","a":6,"b":7})");
+    EXPECT_EQ(response.status, kStatusInternalError);
+    EXPECT_EQ(response.result, 0);
+    EXPECT_EQ(response.error, "Internal error"); // без подробностей о БД
 }

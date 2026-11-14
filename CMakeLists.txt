@@ -68,7 +68,7 @@ add_library(calculator_lib
   src/Parser.cpp
   src/Checker.cpp
   src/Calculator.cpp
-  src/Printer.cpp
+  src/Protocol.cpp
   src/Runner.cpp
   src/Postgres.cpp
   src/DataBase.cpp

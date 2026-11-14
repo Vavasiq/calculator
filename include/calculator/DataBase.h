@@ -2,6 +2,7 @@
 
 #include "calculator/Postgres.h"
 #include "calculator/Task.h"
+#include "calculator/TaskStorage.h"
 
 #include <cstdint>
 #include <optional>
@@ -10,7 +11,7 @@
 
 namespace calculator {
 
-class DataBase {
+class DataBase : public TaskStorage {
 public:
     struct Config {
         std::string host{"localhost"};
@@ -22,7 +23,7 @@ public:
 
     DataBase();
     explicit DataBase(Config config);
-    ~DataBase();
+    ~DataBase() override;
 
     DataBase(const DataBase&) = delete;
     DataBase& operator=(const DataBase&) = delete;
@@ -33,8 +34,8 @@ public:
     void disconnect();
     void warmUpCache();
 
-    std::optional<Task> getRecord(Task task) const;
-    void writeRecord(Task task);
+    std::optional<Task> getRecord(Task task) const override;
+    void writeRecord(Task task) override;
 
 private:
     void createTable();
