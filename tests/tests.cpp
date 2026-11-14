@@ -68,6 +68,24 @@ TEST(ParserTest, ThrowsOnMulticharOp) {
     EXPECT_THROW(p.parse(R"({"op":"++","a":1,"b":2})"), std::invalid_argument);
 }
 
+TEST(ParserTest, ThrowsOnIntOverflow) {
+    // Раньше get<int>() молча превращал такие числа в другие.
+    Parser p;
+    EXPECT_THROW(p.parse(R"({"op":"+","a":3000000000,"b":1})"), std::invalid_argument);
+    EXPECT_THROW(p.parse(R"({"op":"+","a":-3000000000,"b":1})"), std::invalid_argument);
+    EXPECT_THROW(p.parse(R"({"op":"+","a":1,"b":2147483648})"), std::invalid_argument);
+    EXPECT_THROW(p.parse(R"({"op":"+","a":18446744073709551615,"b":1})"), std::invalid_argument); // uint64 max
+    EXPECT_THROW(p.parse(R"({"op":"+","a":1e30,"b":1})"), std::invalid_argument);                  // дробное
+    EXPECT_THROW(p.parse(R"({"op":"!","a":99999999999})"), std::invalid_argument);
+}
+
+TEST(ParserTest, AcceptsIntBoundaries) {
+    Parser p;
+    const auto task = p.parse(R"({"op":"+","a":2147483647,"b":-2147483648})");
+    EXPECT_EQ(task.firstValue, 2147483647);
+    EXPECT_EQ(task.secondValue, -2147483647 - 1);
+}
+
 // Checker
 
 TEST(CheckerTest, AcceptsValidAddition) {
@@ -134,6 +152,48 @@ TEST(CalculatorTest, NegativeFactorialHasDomainStatus) {
     Calculator calc;
     const auto task = calc.calculate({-1, 0, '!'});
     EXPECT_EQ(task.status, mathlib::MATH_DOMAIN);
+}
+
+TEST(CalculatorTest, LargeFactorialOverflowsFast) {
+    // Без защиты mathlib::fact ушла бы в рекурсию глубиной 10^8 и уронила процесс (стек).
+    Calculator calc;
+    const auto huge = calc.calculate({100000000, 0, '!'});
+    EXPECT_EQ(huge.status, mathlib::MATH_OVERFLOW);
+    EXPECT_EQ(huge.result, 0);
+
+    // Граница: 12! помещается в int, 13! — нет.
+    const auto twelve = calc.calculate({12, 0, '!'});
+    EXPECT_EQ(twelve.status, mathlib::MATH_OK);
+    EXPECT_EQ(twelve.result, 479001600);
+    EXPECT_EQ(calc.calculate({13, 0, '!'}).status, mathlib::MATH_OVERFLOW);
+    EXPECT_EQ(calc.calculate({0, 0, '!'}).result, 1);
+}
+
+TEST(CalculatorTest, PowerOfOneWithHugeExponentIsFast) {
+    // Без защиты mathlib::powi крутил бы цикл 2·10^9 раз на каждый вызов — секунды.
+    // Верхняя граница щедрая: с защитой это микросекунды даже под Valgrind.
+    Calculator calc;
+    const auto started = std::chrono::steady_clock::now();
+
+    const auto one = calc.calculate({1, 2000000000, '^'});
+    const auto zero = calc.calculate({0, 2000000000, '^'});
+    const auto minusOneEven = calc.calculate({-1, 2000000000, '^'});
+    const auto minusOneOdd = calc.calculate({-1, 2147483647, '^'});
+
+    EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::seconds(1));
+    EXPECT_EQ(one.result, 1);
+    EXPECT_EQ(zero.result, 0);
+    EXPECT_EQ(minusOneEven.result, 1);
+    EXPECT_EQ(minusOneOdd.result, -1);
+    for (const auto& task : {one, zero, minusOneEven, minusOneOdd}) {
+        EXPECT_EQ(task.status, mathlib::MATH_OK);
+    }
+
+    // Остальное поведение mathlib сохранено.
+    EXPECT_EQ(calc.calculate({0, 0, '^'}).result, 1);
+    EXPECT_EQ(calc.calculate({1, -1, '^'}).status, mathlib::MATH_DOMAIN);
+    EXPECT_EQ(calc.calculate({2, 31, '^'}).status, mathlib::MATH_OVERFLOW);
+    EXPECT_EQ(calc.calculate({-2, 31, '^'}).result, -2147483647 - 1); // INT_MIN помещается
 }
 
 // Cache key

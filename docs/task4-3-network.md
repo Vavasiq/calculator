@@ -327,7 +327,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 | `SurvivesClientDisconnectBeforeResponse` | Клиент отправил 50 запросов одним пакетом и сразу закрыл сокет, так что сервер пишет ответы в закрытое соединение. Процесс жив (проверка `SIGPIPE`), следующий клиент получает правильный результат |
 | `StopsOnStopRequest` | `requestStop` при активной сессии → поток сервера завершился (`waitUntil` с таймаутом), подключённый клиент видит закрытие соединения, новое подключение отклоняется |
 | `StopBeforeRunIsNotLost` | `requestStop` до старта `TestServer` → `runServer` сразу возвращается. Сквозная проверка правила «подписка после остановки вызывается сразу» |
-| `HeavyInputsAnsweredOverNetwork` (шаг 5) | `{"op":"!","a":100000000}` → `status 1` (переполнение) в пределах таймаута. Процесс жив, следующий запрос обслуживается |
+| `HeavyInputsAnsweredOverNetwork` (шаг 5) | `{"op":"!","a":100000000}` → `status 1` (переполнение), `1^2000000000` → `1`, `"a":3000000000` → `-1`, всё в пределах таймаута. Процесс жив, следующий запрос обслуживается |
 
 ### Интеграционный тест с настоящей БД
 
@@ -364,7 +364,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 
 1. **Переполнение `int` в `Parser`.** `"a": 3000000000` проходит проверку `is_number_integer()`, а `get<int>()` молча превращает его в другое число (найдено ещё при первом разборе проекта). Исправление: проверять диапазон `INT_MIN..INT_MAX`, иначе `-1`. Тест `ParserTest.ThrowsOnIntOverflow`.
 2. **`mathlib::fact` рекурсивна на глубину `n`.** `{"op":"!","a":100000000}` переполнит стек рабочего потока: `SIGSEGV`, сервис падает. systemd его перезапустит, но уронить сервис может любой клиент. Поскольку уже `13!` не помещается в `int`, `Calculator` при `n > 12` сразу возвращает `MATH_OVERFLOW`, не вызывая `fact`. Тест `CalculatorTest.LargeFactorialOverflowsFast`.
-3. **`mathlib::powi` крутит цикл `exp` раз.** Для оснований `0`, `1`, `-1` и `exp = 2000000000` это секунды CPU в рабочем потоке: сервис не отвечает, остановка задерживается. При `|base| ≥ 2` переполнение наступает максимум за 31 итерацию. `Calculator` считает эти три основания напрямую: `1 → 1`; `0 → (exp == 0 ? 1 : 0)`; `-1 → ±1` по чётности. Тест `CalculatorTest.PowerOfOneWithHugeExponentIsFast`.
+3. **`mathlib::powi` крутит цикл `exp` раз.** Для оснований `0`, `1`, `-1` и `exp = 2000000000` это секунды CPU в рабочем потоке: сервис не отвечает, остановка задерживается. При `|base| ≥ 2` переполнение наступает максимум за 32 итерации: `(-2)^31 = INT_MIN` ещё помещается в `int`. `Calculator` считает эти три основания напрямую: `1 → 1`; `0 → (exp == 0 ? 1 : 0)`; `-1 → ±1` по чётности. Тест `CalculatorTest.PowerOfOneWithHugeExponentIsFast`.
 
    Пункты 2–3 можно исправить и в самой `mathlib` (выпустить v0.1.2 и поднять `GIT_TAG`). Защита в `Calculator` локальная и проверяется тестами уже сейчас.
 4. **Простаивающий клиент занимает единственное место навсегда** (модель «один клиент за раз»). Решение — таймаут простоя на `steady_timer` в сессии. Вне рамок, но стоит упомянуть в README.
@@ -416,7 +416,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 ### Шаг 5. Защита входа (раздел 13)
 - **Что:** проверка диапазона `int` в `Parser`; в `Calculator` — быстрый ответ для `!` при `n > 12` и для `^` с основаниями `0`, `1`, `-1`.
 - **Файлы:** `Parser.cpp`, `Calculator.cpp`.
-- **Тесты:** `ParserTest.ThrowsOnIntOverflow`, `CalculatorTest.LargeFactorialOverflowsFast`, `CalculatorTest.PowerOfOneWithHugeExponentIsFast`, сетевой `HeavyInputsAnsweredOverNetwork`.
+- **Тесты:** `ParserTest.ThrowsOnIntOverflow`, `ParserTest.AcceptsIntBoundaries`, `CalculatorTest.LargeFactorialOverflowsFast`, `CalculatorTest.PowerOfOneWithHugeExponentIsFast`, сетевой `HeavyInputsAnsweredOverNetwork`. Проверено на копии `Calculator.cpp` без защиты: тест `^` падает по границе времени (5,2 с при границе 1 с), а тест `!` и сетевой тест роняют процесс переполнением стека.
 - **Готово, когда:** тесты зелёные, полная проверка раздела 15 пройдена (systemd, TSan и Valgrind на реальном процессе). На этом задача 3 закрыта. Финальный TSan-прогон повторяется после задачи 4 (раздел 12).
 
 ## 15. Проверка готовности

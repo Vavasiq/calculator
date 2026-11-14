@@ -201,6 +201,30 @@ TEST_F(ServerTest, StopsOnStopRequest) {
     EXPECT_FALSE(late.connect(port)) << "server still accepts connections after stop";
 }
 
+TEST_F(ServerTest, HeavyInputsAnsweredOverNetwork) {
+    // Входы, которые до защиты (раздел 13 плана) роняли или подвешивали сервис одним запросом.
+    TestClient client;
+    ASSERT_TRUE(client.connect(server.port())) << client.lastError();
+
+    const auto factorial = client.request(R"({"op":"!","a":100000000})"); // раньше: переполнение стека
+    ASSERT_TRUE(factorial) << client.lastError();
+    EXPECT_EQ(factorial->status, mathlib::MATH_OVERFLOW);
+
+    const auto power = client.request(R"({"op":"^","a":1,"b":2000000000})"); // раньше: секунды CPU
+    ASSERT_TRUE(power) << client.lastError();
+    EXPECT_EQ(power->status, mathlib::MATH_OK);
+    EXPECT_EQ(power->result, 1);
+
+    const auto overflow = client.request(R"({"op":"+","a":3000000000,"b":1})"); // раньше: молча другое число
+    ASSERT_TRUE(overflow) << client.lastError();
+    EXPECT_EQ(overflow->status, kStatusInvalidRequest);
+
+    // Сервис жив и обслуживает дальше.
+    const auto normal = client.request(R"({"op":"+","a":20,"b":22})");
+    ASSERT_TRUE(normal) << client.lastError();
+    EXPECT_EQ(normal->result, 42);
+}
+
 TEST(ServerStopTest, StopBeforeRunIsNotLost) {
     // Подписка после requestStop вызывается сразу: io.stop() до io.run() -> run() возвращается
     // немедленно. Так же сервис ведёт себя, если SIGTERM пришёл во время подключения к БД.
