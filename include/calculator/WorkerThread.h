@@ -1,21 +1,19 @@
 #pragma once
 
-#include "calculator/DataBase.h"
+#include "calculator/Config.h"
 #include "calculator/StopFlag.h"
 
-#include <optional>
-#include <string>
 #include <thread>
 
 namespace calculator {
 
-// Рабочий поток: создаёт Runner (подключение к БД, прогрев кеша), обрабатывает
-// начальное задание и ждёт остановки. Runner и все объекты БД живут только в этом
-// потоке и уничтожаются в нём же, после чего соединение закрыто (PQfinish).
+// Рабочий поток: подключение к БД и прогрев кеша, затем TCP-сервер (runServer) до остановки.
+// DataBase, Runner, io_context и сокеты живут только в этом потоке и уничтожаются в нём же:
+// после остановки сокеты закрыты, соединение с БД закрыто (PQfinish).
 class WorkerThread {
 public:
-    // dbConfig копируется в поле до старта потока и дальше используется только им.
-    WorkerThread(StopFlag& stopFlag, DataBase::Config dbConfig, std::optional<std::string> initialTask);
+    // config копируется в поле до старта потока и дальше используется только им.
+    WorkerThread(StopFlag& stopFlag, AppConfig config);
     ~WorkerThread();
 
     WorkerThread(const WorkerThread&) = delete;
@@ -32,8 +30,7 @@ private:
     void run();
 
     StopFlag& stopFlag_;
-    DataBase::Config dbConfig_;
-    std::optional<std::string> initialTask_;
+    AppConfig config_;
     int exitCode_{0};
     std::thread thread_; // последним: поток стартует, когда остальные поля готовы
 };

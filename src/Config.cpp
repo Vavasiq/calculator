@@ -1,5 +1,6 @@
 #include "calculator/Config.h"
 
+#include <boost/asio/ip/address.hpp>
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
@@ -66,6 +67,23 @@ AppConfig parseConfig(const std::string& json) {
         readString(database, "name", "database.name", config.database.database);
         readString(database, "user", "database.user", config.database.username);
         readString(database, "password", "database.password", config.database.password);
+    }
+
+    if (root.contains("server")) {
+        const auto& server = root.at("server");
+        if (!server.is_object()) {
+            throw std::invalid_argument("Config field 'server' must be an object");
+        }
+        readString(server, "address", "server.address", config.server.address);
+        readPort(server, "port", "server.port", config.server.port);
+
+        // Проверяем адрес здесь, а не при bind: ошибка конфига отсекается в main до запуска потоков.
+        boost::system::error_code error;
+        boost::asio::ip::make_address(config.server.address, error);
+        if (error) {
+            throw std::invalid_argument("Config field 'server.address' is not a valid IP address: '" +
+                                        config.server.address + "'");
+        }
     }
 
     return config;

@@ -14,6 +14,10 @@ public:
     // до создания любых потоков: они унаследуют маску, и сигнал получит только sigwait.
     static void blockTerminationSignals();
 
+    // SIGPIPE -> SIG_IGN для всего процесса: запись в сокет, закрытый клиентом, вернёт EPIPE
+    // (Asio сообщит broken_pipe), а не убьёт процесс. Вызывать в main до создания потоков.
+    static void ignoreBrokenPipe();
+
     explicit SignalThread(StopFlag& stopFlag);
     ~SignalThread();
 

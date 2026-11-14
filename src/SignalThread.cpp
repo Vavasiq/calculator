@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <signal.h>
 
+#include <cerrno>
 #include <cstring>
 #include <exception>
 #include <string>
@@ -37,6 +38,15 @@ void SignalThread::blockTerminationSignals() {
     const int rc = pthread_sigmask(SIG_BLOCK, &set, nullptr);
     if (rc != 0) {
         throw std::system_error(rc, std::generic_category(), "pthread_sigmask");
+    }
+}
+
+void SignalThread::ignoreBrokenPipe() {
+    struct sigaction action {};
+    action.sa_handler = SIG_IGN;
+    sigemptyset(&action.sa_mask);
+    if (sigaction(SIGPIPE, &action, nullptr) != 0) {
+        throw std::system_error(errno, std::generic_category(), "sigaction(SIGPIPE)");
     }
 }
 

@@ -1,19 +1,18 @@
 #include "calculator/WorkerThread.h"
+#include "calculator/DataBase.h"
 #include "calculator/Logger.h"
-#include "calculator/Protocol.h"
 #include "calculator/Runner.h"
+#include "calculator/Server.h"
 
 #include <exception>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
 namespace calculator {
 
-WorkerThread::WorkerThread(StopFlag& stopFlag, DataBase::Config dbConfig, std::optional<std::string> initialTask)
-    : stopFlag_(stopFlag), dbConfig_(std::move(dbConfig)), initialTask_(std::move(initialTask)),
-      thread_(&WorkerThread::run, this) {}
+WorkerThread::WorkerThread(StopFlag& stopFlag, AppConfig config)
+    : stopFlag_(stopFlag), config_(std::move(config)), thread_(&WorkerThread::run, this) {}
 
 WorkerThread::~WorkerThread() {
     join();
@@ -35,23 +34,20 @@ int WorkerThread::exitCode() const {
 void WorkerThread::run() {
     try {
         {
-            // После старта dbConfig_ трогает только этот поток, поэтому его можно переместить.
-            DataBase dataBase(std::move(dbConfig_));
+            // После старта config_ трогает только этот поток, поэтому его можно переместить.
+            DataBase dataBase(std::move(config_.database));
             dataBase.connect();
             dataBase.warmUpCache();
 
             Runner runner(dataBase); // объявлен после dataBase -> уничтожается раньше неё
 
-            if (initialTask_) {
-                // ВРЕМЕННО (шаг 2 плана docs/task4-3-network.md): ответ на задание из командной
-                // строки выводится в stdout. На шаге 3 задания будут приходить по сети,
-                // и этот вывод уберётся вместе с аргументом командной строки.
-                std::cout << serializeResponse(runner.handle(*initialTask_)) << std::endl;
-            }
+            // Возвращается после requestStop (SIGTERM/SIGINT через подписку -> io_context::stop()).
+            runServer(config_.server, runner, stopFlag_, [](const boost::asio::ip::tcp::endpoint& endpoint) {
+                Logger::instance().info("Listening on " + endpoint.address().to_string() + ":" +
+                                        std::to_string(endpoint.port()));
+            });
 
-            Logger::instance().info("Worker is waiting for stop request");
-            stopFlag_.waitForStop();
-            Logger::instance().info("Worker is shutting down");
+            Logger::instance().info("Server stopped");
         } // ~Runner, затем ~DataBase -> PQfinish
 
         Logger::instance().info("Database connection closed");

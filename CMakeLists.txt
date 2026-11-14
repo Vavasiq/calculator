@@ -32,6 +32,14 @@ include(FetchContent)
 find_package(Threads REQUIRED)
 find_package(PostgreSQL REQUIRED)
 
+# Boost.Asio — только заголовки (apt: libboost-dev). Бинарник не линкуется с .so из Boost,
+# поэтому в deb-пакете зависимости от Boost во время работы нет.
+# CMake 3.30+ удалил модуль FindBoost (CMP0167): берём BoostConfig.cmake из пакета.
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+find_package(Boost 1.74 REQUIRED)
+
 FetchContent_Declare(
   mathlib
   GIT_REPOSITORY https://github.com/vavasiq/mathlib.git
@@ -76,6 +84,7 @@ add_library(calculator_lib
   src/SignalThread.cpp
   src/WorkerThread.cpp
   src/Config.cpp
+  src/Server.cpp
 )
 
 target_include_directories(calculator_lib PUBLIC
@@ -90,6 +99,7 @@ target_link_libraries(calculator_lib
   PUBLIC
     PostgreSQL::PostgreSQL
     Threads::Threads
+    Boost::headers # PUBLIC: Server.h открывает типы Asio
 )
 
 target_compile_options(calculator_lib PRIVATE -Wall -Wextra -Wpedantic)

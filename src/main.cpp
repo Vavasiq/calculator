@@ -16,34 +16,27 @@ namespace {
 
 struct CommandLine {
     std::optional<std::string> configPath;
-    std::optional<std::string> initialTask;
 };
 
 void printUsage() {
-    std::cerr << "Usage: calculator [--config <path>] ['<json>']\n"
-              << "Example: calculator '{\"op\":\"+\",\"a\":3,\"b\":4}'\n"
-              << "Without a task runs as a service until SIGINT/SIGTERM.\n"
+    std::cerr << "Usage: calculator [--config <path>]\n"
+              << "Runs as a TCP service until SIGINT/SIGTERM. Tasks arrive over the network,\n"
+              << "one JSON line per request, e.g.:\n"
+              << "  printf '{\"op\":\"+\",\"a\":3,\"b\":4}\\n' | nc -N 127.0.0.1 7777\n"
               << "Default config: " << calculator::kDefaultConfigPath
               << " (built-in defaults are used if it does not exist).\n";
 }
 
-// std::nullopt — аргументы некорректны.
+// std::nullopt — аргументы некорректны. Задание в аргументах больше не принимается:
+// задания приходят только по сети.
 std::optional<CommandLine> parseCommandLine(int argc, char** argv) {
     CommandLine commandLine;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--config") {
-            if (i + 1 >= argc || commandLine.configPath) {
-                return std::nullopt;
-            }
+        if (arg == "--config" && i + 1 < argc && !commandLine.configPath) {
             commandLine.configPath = argv[++i];
-        } else if (arg.rfind("--", 0) == 0) {
-            return std::nullopt; // неизвестная опция
         } else {
-            if (commandLine.initialTask) {
-                return std::nullopt;
-            }
-            commandLine.initialTask = arg;
+            return std::nullopt;
         }
     }
     return commandLine;
@@ -88,6 +81,8 @@ int main(int argc, char** argv) {
     // получит только sigwait в потоке сигналов.
     try {
         calculator::SignalThread::blockTerminationSignals();
+        // Тоже до потоков: запись в сокет, закрытый клиентом, не должна убить процесс.
+        calculator::SignalThread::ignoreBrokenPipe();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
@@ -111,7 +106,7 @@ int main(int argc, char** argv) {
     try {
         calculator::StopFlag stopFlag;
         calculator::SignalThread signals(stopFlag);
-        calculator::WorkerThread worker(stopFlag, std::move(config.database), std::move(commandLine->initialTask));
+        calculator::WorkerThread worker(stopFlag, std::move(config));
 
         // Явный порядок, не зависящий от порядка деструкторов.
         worker.join();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "calculator/DataBase.h"
+#include "calculator/ServerConfig.h"
 
 #include <string>
 
@@ -9,18 +10,19 @@ namespace calculator {
 // Путь, по которому сервис ищет конфиг, если --config не задан.
 inline constexpr const char* kDefaultConfigPath = "/etc/calculator/calculator.json";
 
-// Конфигурация приложения верхнего уровня. Отдельная структура, чтобы в задаче 3
-// добавить секцию server (порт) без изменения сигнатур.
+// Конфигурация приложения верхнего уровня.
 struct AppConfig {
     DataBase::Config database;
+    ServerConfig server;
 };
 
 // Разбирает JSON-текст конфига. Отсутствующие ключи берут значения по умолчанию
-// из DataBase::Config, ключ с неверным типом или значением -> std::invalid_argument.
+// (DataBase::Config, ServerConfig), ключ с неверным типом или значением -> std::invalid_argument.
 //
 // Формат:
 // {
-//   "database": { "host": "...", "port": 5432, "name": "...", "user": "...", "password": "..." }
+//   "database": { "host": "...", "port": 5432, "name": "...", "user": "...", "password": "..." },
+//   "server":   { "address": "127.0.0.1", "port": 7777 }
 // }
 AppConfig parseConfig(const std::string& json);
 

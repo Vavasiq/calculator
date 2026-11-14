@@ -171,6 +171,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
                          └─ EOF / ошибка ─▶ закрыть сокет, очистить буфер ─▶ async_accept
 ```
 - **Буфер** — `boost::asio::streambuf` с `max_size` 4096. Если `\n` не найден до заполнения, `read_until` завершается с ошибкой `not_found`. Это и есть случай «Request too long».
+- **Аккуратное закрытие после «Request too long».** В сокете остаются непрочитанные байты. Если в этот момент вызвать `close()`, Linux отправит клиенту RST вместо FIN и выбросит ещё не отправленные данные, включая наш ответ. Поэтому порядок такой: ответ `-1` → `shutdown(send)` (клиент получает ответ и EOF) → остаток дочитывается и выбрасывается до EOF от клиента → `close()`.
 - **После чтения из буфера удаляется ровно одна строка.** Остаток остаётся в буфере, так работает pipelining.
 - **Строка ответа хранится в поле `Server`**, пока `async_write` не завершится.
 - **При закрытии сессии буфер очищается**, чтобы остаток данных предыдущего клиента не попал следующему.
@@ -223,6 +224,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
   - `std::string serializeResponse(const Response&)` — JSON без `\n`, перевод строки добавляет сервер.
 - **`include/calculator/TaskStorage.h`** — интерфейс `getRecord`/`writeRecord`, только заголовок.
 - **`include/calculator/Server.h`, `src/Server.cpp`** — класс `Server` (акцептор, сокет текущего клиента, буфер, строка ответа, ссылка на `Runner`) и функция `runServer` (раздел 6).
+- **`include/calculator/ServerConfig.h`** — `ServerConfig` отдельным заголовком. Так `Server.h` не тянет `Config.h` → `DataBase.h` → libpq. `Config.h` его подключает.
 - **`tests/TestClient.h`, `tests/TestClient.cpp`, `tests/TestServer.h`, `tests/InMemoryStorage.h`, `tests/network_tests.cpp`** — вспомогательные классы, сетевые тесты и интеграционный тест с настоящей БД (раздел 11).
 
 ### Изменяемые файлы
@@ -309,7 +311,7 @@ async_accept → async_read_until('\n') → runner.handle(строка) → asyn
 - `InvalidUtf8RequestGivesSerializableResponse` — запрос с сырым байтом `\xff` даёт `-1`, ответ сериализуется без исключения;
 - `StorageFailureGivesInternalError` — у хранилища ломается запись (`FailingStorage`), ответ `-2` без подробностей о БД.
 
-**`Config`:** `ParsesServerSection`, `ServerSectionDefaults`, `ThrowsOnInvalidAddress`.
+**`Config`:** `ParsesServerSection` (в том числе IPv6 `::1`), `ServerSectionDefaults`, `ThrowsOnInvalidServerSection` (не IP-адрес, адрес не строкой, порт `0`, порт строкой, секция не объектом).
 
 **`Server`** (`network_tests.cpp`, через `TestServer` + `TestClient`, проверяется ответ, полученный по сети):
 

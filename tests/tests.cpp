@@ -405,6 +405,38 @@ TEST(ConfigTest, ThrowsOnInvalidJson) {
     EXPECT_THROW(parseConfig(""), std::invalid_argument);
 }
 
+TEST(ConfigTest, ParsesServerSection) {
+    const auto config = parseConfig(R"({"server": {"address": "0.0.0.0", "port": 9000}})");
+    EXPECT_EQ(config.server.address, "0.0.0.0");
+    EXPECT_EQ(config.server.port, 9000);
+
+    const auto ipv6 = parseConfig(R"({"server": {"address": "::1"}})");
+    EXPECT_EQ(ipv6.server.address, "::1");
+}
+
+TEST(ConfigTest, ServerSectionDefaults) {
+    const ServerConfig defaults;
+    EXPECT_EQ(defaults.address, "127.0.0.1");
+    EXPECT_EQ(defaults.port, 7777);
+
+    const auto empty = parseConfig("{}");
+    EXPECT_EQ(empty.server.address, defaults.address);
+    EXPECT_EQ(empty.server.port, defaults.port);
+
+    const auto partial = parseConfig(R"({"server": {"port": 7778}})");
+    EXPECT_EQ(partial.server.address, defaults.address);
+    EXPECT_EQ(partial.server.port, 7778);
+}
+
+TEST(ConfigTest, ThrowsOnInvalidServerSection) {
+    EXPECT_THROW(parseConfig(R"({"server": {"address": "localhost"}})"), std::invalid_argument); // не IP
+    EXPECT_THROW(parseConfig(R"({"server": {"address": "300.1.1.1"}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"server": {"address": 127}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"server": {"port": 0}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"server": {"port": "7777"}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"server": 7777})"), std::invalid_argument);
+}
+
 // Protocol
 
 TEST(ProtocolTest, SerializesSuccess) {
