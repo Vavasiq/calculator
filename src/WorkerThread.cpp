@@ -10,8 +10,9 @@
 
 namespace calculator {
 
-WorkerThread::WorkerThread(StopFlag& stopFlag, std::optional<std::string> initialTask)
-    : stopFlag_(stopFlag), initialTask_(std::move(initialTask)), thread_(&WorkerThread::run, this) {}
+WorkerThread::WorkerThread(StopFlag& stopFlag, DataBase::Config dbConfig, std::optional<std::string> initialTask)
+    : stopFlag_(stopFlag), dbConfig_(std::move(dbConfig)), initialTask_(std::move(initialTask)),
+      thread_(&WorkerThread::run, this) {}
 
 WorkerThread::~WorkerThread() {
     join();
@@ -33,7 +34,8 @@ int WorkerThread::exitCode() const {
 void WorkerThread::run() {
     try {
         {
-            Runner runner;
+            // После старта dbConfig_ трогает только этот поток, поэтому его можно переместить.
+            Runner runner(std::move(dbConfig_));
 
             if (initialTask_) {
                 runner.run(*initialTask_);

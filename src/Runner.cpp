@@ -7,10 +7,11 @@
 
 #include <exception>
 #include <iostream>
+#include <utility>
 
 namespace calculator {
 
-Runner::Runner() {
+Runner::Runner(DataBase::Config config): dataBase_(std::move(config)) {
     dataBase_.connect();
     dataBase_.warmUpCache();
 }

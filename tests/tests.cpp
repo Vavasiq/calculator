@@ -2,6 +2,7 @@
 
 #include "calculator/Calculator.h"
 #include "calculator/Checker.h"
+#include "calculator/Config.h"
 #include "calculator/Parser.h"
 #include "calculator/StopFlag.h"
 #include "calculator/Task.h"
@@ -192,4 +193,58 @@ TEST(StopFlagTest, FirstReasonWins) {
 
     EXPECT_EQ(flag.reason(), StopReason::Signal);
     EXPECT_EQ(flag.signalNumber(), SIGTERM);
+}
+
+// Config
+
+TEST(ConfigTest, ParsesAllFields) {
+    const auto config = parseConfig(R"({
+        "database": {
+            "host": "db.internal",
+            "port": 6543,
+            "name": "calc_db",
+            "user": "calc_user",
+            "password": "s3cret"
+        }
+    })");
+    EXPECT_EQ(config.database.host, "db.internal");
+    EXPECT_EQ(config.database.port, 6543);
+    EXPECT_EQ(config.database.database, "calc_db");
+    EXPECT_EQ(config.database.username, "calc_user");
+    EXPECT_EQ(config.database.password, "s3cret");
+}
+
+TEST(ConfigTest, MissingKeysUseDefaults) {
+    const DataBase::Config defaults;
+
+    const auto empty = parseConfig("{}");
+    EXPECT_EQ(empty.database.host, defaults.host);
+    EXPECT_EQ(empty.database.port, defaults.port);
+    EXPECT_EQ(empty.database.database, defaults.database);
+    EXPECT_EQ(empty.database.username, defaults.username);
+    EXPECT_EQ(empty.database.password, defaults.password);
+
+    // Частичная секция: заданный ключ читается, остальные остаются по умолчанию.
+    const auto partial = parseConfig(R"({"database": {"port": 5433}})");
+    EXPECT_EQ(partial.database.port, 5433);
+    EXPECT_EQ(partial.database.host, defaults.host);
+    EXPECT_EQ(partial.database.password, defaults.password);
+}
+
+TEST(ConfigTest, ThrowsOnWrongType) {
+    EXPECT_THROW(parseConfig(R"({"database": {"port": "abc"}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"database": {"host": 42}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"database": "localhost"})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig("[]"), std::invalid_argument);
+}
+
+TEST(ConfigTest, ThrowsOnPortOutOfRange) {
+    EXPECT_THROW(parseConfig(R"({"database": {"port": 0}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"database": {"port": 65536}})"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(R"({"database": {"port": -1}})"), std::invalid_argument);
+}
+
+TEST(ConfigTest, ThrowsOnInvalidJson) {
+    EXPECT_THROW(parseConfig("{not json"), std::invalid_argument);
+    EXPECT_THROW(parseConfig(""), std::invalid_argument);
 }

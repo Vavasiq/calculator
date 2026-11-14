@@ -1,5 +1,6 @@
 #pragma once
 
+#include "calculator/DataBase.h"
 #include "calculator/StopFlag.h"
 
 #include <optional>
@@ -13,7 +14,8 @@ namespace calculator {
 // потоке и уничтожаются в нём же, после чего соединение закрыто (PQfinish).
 class WorkerThread {
 public:
-    WorkerThread(StopFlag& stopFlag, std::optional<std::string> initialTask);
+    // dbConfig копируется в поле до старта потока и дальше используется только им.
+    WorkerThread(StopFlag& stopFlag, DataBase::Config dbConfig, std::optional<std::string> initialTask);
     ~WorkerThread();
 
     WorkerThread(const WorkerThread&) = delete;
@@ -30,6 +32,7 @@ private:
     void run();
 
     StopFlag& stopFlag_;
+    DataBase::Config dbConfig_;
     std::optional<std::string> initialTask_;
     int exitCode_{0};
     std::thread thread_; // последним: поток стартует, когда остальные поля готовы

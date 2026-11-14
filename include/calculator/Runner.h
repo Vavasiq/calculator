@@ -8,7 +8,7 @@ namespace calculator {
 
 class Runner {
 public:
-    Runner();
+    explicit Runner(DataBase::Config config);
     ~Runner() = default;
 
     int run(const std::string& json_str);
