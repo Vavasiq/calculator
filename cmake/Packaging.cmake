@@ -49,6 +49,18 @@ set(CPACK_SET_DESTDIR ON)
 # (путь подставлен configure_file из CMAKE_INSTALL_PREFIX).
 set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 
+# Скрипты сопровождающего и conffiles (план, раздел 4): postinst создаёт пользователя
+# calculator и выставляет права на конфиг, conffiles сохраняет правки конфига при обновлении.
+set(_calculator_deb_dir "${PROJECT_SOURCE_DIR}/packaging/deb")
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    "${_calculator_deb_dir}/conffiles"
+    "${_calculator_deb_dir}/postinst"
+    "${_calculator_deb_dir}/prerm"
+    "${_calculator_deb_dir}/postrm")
+# Права в control.tar по политике Debian: скрипты 0755, conffiles 0644 — независимо от
+# прав файлов в рабочей копии.
+set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
+
 # Проверка префикса выполняется только при запуске cpack, обычные сборки её не видят.
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_CURRENT_LIST_DIR}/CPackProjectConfig.cmake")
 

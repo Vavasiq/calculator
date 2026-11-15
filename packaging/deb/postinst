@@ -1,0 +1,57 @@
+#!/bin/sh
+# postinst пакета calculator (план: docs/task4-4-deb.md, раздел 4).
+set -e
+
+CONFIG=/etc/calculator/calculator.json
+
+systemd_running() {
+    [ -d /run/systemd/system ]
+}
+
+case "$1" in
+    configure)
+        # 1. Системный пользователь сервиса. Если он уже есть (например, создан вручную
+        #    в задаче 2), ничего не делаем. Если есть только группа calculator — используем её.
+        if ! getent passwd calculator >/dev/null; then
+            if getent group calculator >/dev/null; then
+                group_option="--gid calculator"
+            else
+                group_option="--user-group"
+            fi
+            # shellcheck disable=SC2086
+            useradd --system $group_option --no-create-home --home-dir /nonexistent \
+                --shell /usr/sbin/nologin calculator
+        fi
+
+        # 2. В конфиге пароль БД: читают только root и сервис. В самом пакете владельца
+        #    calculator задать нельзя — при сборке такого пользователя ещё нет.
+        if [ -f "$CONFIG" ]; then
+            chown root:calculator "$CONFIG"
+            chmod 0640 "$CONFIG"
+        fi
+
+        if systemd_running; then
+            systemctl daemon-reload
+            # 3. Обновление или переустановка: если сервис работал, он подхватит новый бинарник.
+            #    Не запущенный сервис try-restart не трогает.
+            systemctl try-restart calculator.service || true
+        fi
+
+        # 4. Автозапуск не включаем: сервису нужны база и роль PostgreSQL, которые пакет
+        #    не создаёт. Без них сервис ушёл бы в цикл перезапусков и затем в failed.
+        if ! systemctl is-enabled --quiet calculator.service 2>/dev/null; then
+            echo "calculator: configure PostgreSQL access in $CONFIG, then run:"
+            echo "calculator:   sudo systemctl enable --now calculator"
+        fi
+        ;;
+
+    abort-upgrade | abort-remove | abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,25 @@
+#!/bin/sh
+# postrm пакета calculator (план: docs/task4-4-deb.md, раздел 4).
+set -e
+
+case "$1" in
+    remove | purge)
+        # unit-файла больше нет — systemd должен об этом узнать.
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+        fi
+        # purge: конфиг (conffile) и пустой /etc/calculator удаляет сам dpkg.
+        # Пользователя calculator не удаляем (рекомендация политики Debian): после него могут
+        # остаться файлы, а повторное создание выдало бы другой UID.
+        ;;
+
+    upgrade | failed-upgrade | abort-install | abort-upgrade | disappear)
+        ;;
+
+    *)
+        echo "postrm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
