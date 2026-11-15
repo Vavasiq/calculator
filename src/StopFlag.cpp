@@ -136,13 +136,6 @@ bool StopFlag::isStopRequested() const {
     return stopRequested_;
 }
 
-void StopFlag::waitForStop() const {
-    std::unique_lock<std::mutex> lock(mutex_);
-    ++waitingThreads_;
-    cv_.wait(lock, [this] { return stopRequested_; });
-    --waitingThreads_;
-}
-
 bool StopFlag::waitForStopFor(std::chrono::milliseconds timeout) const {
     std::unique_lock<std::mutex> lock(mutex_);
     ++waitingThreads_;

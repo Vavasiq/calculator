@@ -71,15 +71,14 @@ public:
 
     bool isStopRequested() const;
 
-    void waitForStop() const;
-
-    // true, если остановка запрошена; false, если истёк таймаут.
+    // Ожидание с ограничением по времени: true, если остановка запрошена; false, если истёк
+    // таймаут. Сервис ждёт остановки в io_context.run() (подписка onStop), это ожидание нужно тестам.
     bool waitForStopFor(std::chrono::milliseconds timeout) const;
 
     StopReason reason() const;
     int signalNumber() const;
 
-    // Сколько потоков сейчас находится внутри waitForStop/waitForStopFor.
+    // Сколько потоков сейчас находится внутри waitForStopFor (для детерминированных тестов).
     // Значение, прочитанное под mutex_, означает, что поток уже ждёт уведомления:
     // cv_.wait отпускает мьютекс атомарно с переходом в ожидание.
     std::size_t waitingThreads() const;
