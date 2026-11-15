@@ -9,7 +9,12 @@ set(CPACK_GENERATOR "DEB")
 
 set(CPACK_PACKAGE_NAME "calculator")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Calculator TCP service with PostgreSQL storage")
+# lintian: краткое описание не должно начинаться с имени пакета; развёрнутое — не пустое.
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "TCP service for integer calculations with PostgreSQL storage")
+set(CPACK_PACKAGE_DESCRIPTION
+    "Accepts calculation tasks as JSON lines over TCP (Boost.Asio) and returns JSON results. "
+    "Results are stored in PostgreSQL and cached in memory. Runs as the systemd service "
+    "calculator.service under the dedicated system user 'calculator'.")
 set(CPACK_PACKAGE_CONTACT "Vavasiq <vavasiq@example.com>")
 
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
@@ -24,6 +29,13 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "postgresql")
 
 set(CPACK_STRIP_FILES TRUE)
+
+# Каталоги в пакете — 0755 независимо от umask того, кто собирает (у пользователя в Ubuntu
+# umask 0002 давал 0775, и /etc/calculator стал бы доступен на запись группе).
+set(CPACK_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE)
 
 # Установка во временный каталог через DESTDIR. Без этого CPack подменяет только
 # CMAKE_INSTALL_PREFIX, и абсолютный путь /etc/calculator остался бы настоящим /etc.

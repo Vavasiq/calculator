@@ -69,6 +69,8 @@ cd build-deb && cpack            # -> calculator_1.0.0_amd64.deb
 | `CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA` | `packaging/deb/conffiles;postinst;prerm;postrm` | Раздел 4 |
 | `CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION` | `TRUE` | Права на скрипты в `control.tar` по политике Debian (`0755`, `conffiles` — `0644`) |
 | `CPACK_STRIP_FILES` | `TRUE` | Бинарник в пакете без отладочных символов |
+| `CPACK_PACKAGE_DESCRIPTION` | развёрнутое описание | lintian: `extended-description-is-empty`. Краткое описание не начинается с имени пакета (`description-starts-with-package-name`) |
+| `CPACK_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS` | `0755` | Найдено lintian на первой сборке: каталоги получали `0775` из umask `0002` того, кто собирает, и `/etc/calculator` стал бы доступен на запись группе |
 | `CPACK_PACKAGING_INSTALL_PREFIX` | `${CMAKE_INSTALL_PREFIX}` | Раздел 2 |
 | `CPACK_SET_DESTDIR` | `ON` | CPack ставит файлы во временный каталог через `DESTDIR`. Без этого он подменяет только `CMAKE_INSTALL_PREFIX`, а абсолютный путь `/etc/calculator` остался бы настоящим `/etc`. Проверка «конфиг уже есть?» в `install(CODE)` из задачи 2 учитывает `DESTDIR`, поэтому во временном каталоге конфиг ставится и попадает в пакет |
 
