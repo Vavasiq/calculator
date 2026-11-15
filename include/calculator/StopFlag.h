@@ -26,26 +26,26 @@ enum class StopReason {
 // Подписка на остановку (onStop): колбэк вызывается ровно один раз, всегда вне mutex_.
 // Если остановка уже запрошена, колбэк вызывается сразу в потоке подписчика.
 class StopFlag {
-public:
+  public:
     // RAII-подписка: деструктор отписывает колбэк. Если колбэк в этот момент выполняется
     // в другом потоке, деструктор ждёт его завершения (как std::stop_callback в C++20).
     // StopFlag должен пережить все свои подписки.
     class Subscription {
-    public:
+      public:
         Subscription() = default;
         ~Subscription();
 
-        Subscription(const Subscription&) = delete;
-        Subscription& operator=(const Subscription&) = delete;
-        Subscription(Subscription&& other) noexcept;
-        Subscription& operator=(Subscription&& other) noexcept;
+        Subscription(const Subscription &) = delete;
+        Subscription &operator=(const Subscription &) = delete;
+        Subscription(Subscription &&other) noexcept;
+        Subscription &operator=(Subscription &&other) noexcept;
 
         // Отписаться досрочно. Повторный вызов и вызов у пустой подписки безопасны.
         void unsubscribe();
 
-    private:
+      private:
         friend class StopFlag;
-        Subscription(StopFlag& flag, std::uint64_t id) noexcept;
+        Subscription(StopFlag &flag, std::uint64_t id) noexcept;
 
         // Невладеющая ссылка на флаг; пустая — подписки нет (вызвана сразу, перемещена, отписана).
         std::optional<std::reference_wrapper<StopFlag>> flag_;
@@ -55,10 +55,10 @@ public:
     StopFlag() = default;
 
     // На объект ссылаются несколько потоков, перемещать его нельзя.
-    StopFlag(const StopFlag&) = delete;
-    StopFlag& operator=(const StopFlag&) = delete;
-    StopFlag(StopFlag&&) = delete;
-    StopFlag& operator=(StopFlag&&) = delete;
+    StopFlag(const StopFlag &) = delete;
+    StopFlag &operator=(const StopFlag &) = delete;
+    StopFlag(StopFlag &&) = delete;
+    StopFlag &operator=(StopFlag &&) = delete;
 
     // Идемпотентно: сохраняется причина первого вызова, повторные ничего не меняют.
     // Колбэки подписчиков вызываются из этого же вызова, вне mutex_.
@@ -72,7 +72,8 @@ public:
     bool isStopRequested() const;
 
     // Ожидание с ограничением по времени: true, если остановка запрошена; false, если истёк
-    // таймаут. Сервис ждёт остановки в io_context.run() (подписка onStop), это ожидание нужно тестам.
+    // таймаут. Сервис ждёт остановки в io_context.run() (подписка onStop), это ожидание нужно
+    // тестам.
     bool waitForStopFor(std::chrono::milliseconds timeout) const;
 
     StopReason reason() const;
@@ -83,11 +84,11 @@ public:
     // cv_.wait отпускает мьютекс атомарно с переходом в ожидание.
     std::size_t waitingThreads() const;
 
-private:
+  private:
     using Callback = std::function<void()>;
 
     void unsubscribe(std::uint64_t id);
-    static void invokeCallback(const Callback& callback) noexcept;
+    static void invokeCallback(const Callback &callback) noexcept;
 
     mutable std::mutex mutex_;
     mutable std::condition_variable cv_;

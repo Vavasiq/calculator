@@ -30,6 +30,6 @@ std::string statusMessage(int status);
 // JSON-строка ответа без '\n' (перевод строки добавляет сервер). Поле error пишется только
 // при status != 0; если оно пустое, подставляется statusMessage(status).
 // Не бросает исключений из-за невалидного UTF-8 в error: такие байты заменяются на U+FFFD.
-std::string serializeResponse(const Response& response);
+std::string serializeResponse(const Response &response);
 
 } // namespace calculator

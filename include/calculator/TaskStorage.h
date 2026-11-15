@@ -9,7 +9,7 @@ namespace calculator {
 // Хранилище результатов. Реализации: DataBase (PostgreSQL + кеш) и InMemoryStorage в тестах.
 // Нужен, чтобы Runner и сервер можно было тестировать без живой БД.
 class TaskStorage {
-public:
+  public:
     virtual ~TaskStorage() = default;
 
     // Задание из кеша или std::nullopt. Операнды коммутативных операций нормализуются внутри.
@@ -18,12 +18,12 @@ public:
     // Сохранить посчитанное задание.
     virtual void writeRecord(Task task) = 0;
 
-protected:
+  protected:
     TaskStorage() = default;
-    TaskStorage(const TaskStorage&) = default;
-    TaskStorage& operator=(const TaskStorage&) = default;
-    TaskStorage(TaskStorage&&) = default;
-    TaskStorage& operator=(TaskStorage&&) = default;
+    TaskStorage(const TaskStorage &) = default;
+    TaskStorage &operator=(const TaskStorage &) = default;
+    TaskStorage(TaskStorage &&) = default;
+    TaskStorage &operator=(TaskStorage &&) = default;
 };
 
 } // namespace calculator

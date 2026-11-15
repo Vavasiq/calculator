@@ -6,7 +6,7 @@
 
 namespace calculator {
 
-void Checker::check(const Task& task) const {
+void Checker::check(const Task &task) const {
     Logger::instance().info(std::string("Checking op='") + task.operation + "'");
 
     const std::string valid_ops = "+-*/^!";

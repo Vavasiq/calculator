@@ -5,9 +5,9 @@
 
 namespace calculator {
 
-PgResult::PgResult(PGresult* result): result_(result) {}
+PgResult::PgResult(PGresult *result) : result_(result) {}
 
-void PgResult::ResultDeleter::operator()(PGresult* result) const {
+void PgResult::ResultDeleter::operator()(PGresult *result) const {
     if (result != nullptr) {
         PQclear(result);
     }
@@ -27,27 +27,27 @@ int PgResult::rows() const {
     return PQntuples(result_.get());
 }
 
-const char* PgResult::value(int row, int column) const {
+const char *PgResult::value(int row, int column) const {
     if (!result_) {
         throw std::runtime_error("PostgreSQL returned null result");
     }
     return PQgetvalue(result_.get(), row, column);
 }
 
-const char* PgResult::errorMessage() const {
+const char *PgResult::errorMessage() const {
     if (!result_) {
         return "PostgreSQL returned null result";
     }
     return PQresultErrorMessage(result_.get());
 }
 
-void PgConnection::ConnectionDeleter::operator()(PGconn* connection) const {
+void PgConnection::ConnectionDeleter::operator()(PGconn *connection) const {
     if (connection != nullptr) {
         PQfinish(connection);
     }
 }
 
-void PgConnection::connect(const std::string& connectionString) {
+void PgConnection::connect(const std::string &connectionString) {
     disconnect();
 
     connection_.reset(PQconnectdb(connectionString.c_str()));
@@ -62,15 +62,13 @@ void PgConnection::connect(const std::string& connectionString) {
     }
 }
 
-void PgConnection::disconnect() {
-    connection_.reset();
-}
+void PgConnection::disconnect() { connection_.reset(); }
 
 bool PgConnection::isConnected() const {
     return connection_ && PQstatus(connection_.get()) == CONNECTION_OK;
 }
 
-PgResult PgConnection::execute(const std::string& query) const {
+PgResult PgConnection::execute(const std::string &query) const {
     if (!isConnected()) {
         throw std::runtime_error("PostgreSQL connection is not open");
     }
@@ -78,19 +76,20 @@ PgResult PgConnection::execute(const std::string& query) const {
     return PgResult(PQexec(connection_.get(), query.c_str()));
 }
 
-PgResult PgConnection::executeParams(const std::string& query, const std::vector<std::string>& params) const {
+PgResult PgConnection::executeParams(const std::string &query,
+                                     const std::vector<std::string> &params) const {
     if (!isConnected()) {
         throw std::runtime_error("PostgreSQL connection is not open");
     }
 
-    std::vector<const char*> values;
+    std::vector<const char *> values;
     values.reserve(params.size());
-    for (const auto& param : params) {
+    for (const auto &param : params) {
         values.push_back(param.c_str());
     }
 
-    return PgResult(PQexecParams(connection_.get(), query.c_str(), static_cast<int>(values.size()), nullptr,
-                                 values.data(), nullptr, nullptr, 0));
+    return PgResult(PQexecParams(connection_.get(), query.c_str(), static_cast<int>(values.size()),
+                                 nullptr, values.data(), nullptr, nullptr, 0));
 }
 
 } // namespace calculator

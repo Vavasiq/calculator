@@ -9,13 +9,14 @@
 namespace calculator {
 
 namespace {
-void ensureCommandSucceeded(const PgResult& result) {
+void ensureCommandSucceeded(const PgResult &result) {
     if (result.status() != PGRES_COMMAND_OK) {
-        throw std::runtime_error(std::string("PostgreSQL command failed: ") + result.errorMessage());
+        throw std::runtime_error(std::string("PostgreSQL command failed: ") +
+                                 result.errorMessage());
     }
 }
 
-void ensureQuerySucceeded(const PgResult& result) {
+void ensureQuerySucceeded(const PgResult &result) {
     if (result.status() != PGRES_TUPLES_OK) {
         throw std::runtime_error(std::string("PostgreSQL query failed: ") + result.errorMessage());
     }
@@ -24,27 +25,23 @@ void ensureQuerySucceeded(const PgResult& result) {
 
 DataBase::DataBase() = default;
 
-DataBase::DataBase(Config config): config_(std::move(config)) {}
+DataBase::DataBase(Config config) : config_(std::move(config)) {}
 
-DataBase::~DataBase() {
-    disconnect();
-}
+DataBase::~DataBase() { disconnect(); }
 
 void DataBase::connect() {
     Logger::instance().info("Connecting to PostgreSQL");
     connection_.connect(connectionString());
 
-    // NOTICE от сервера (например, "relation already exists, skipping" на CREATE TABLE IF NOT EXISTS)
-    // libpq печатает в stderr, а под systemd это строка в журнале при каждом старте.
+    // NOTICE от сервера (например, "relation already exists, skipping" на CREATE TABLE IF NOT
+    // EXISTS) libpq печатает в stderr, а под systemd это строка в журнале при каждом старте.
     // WARNING и ERROR по-прежнему приходят.
     ensureCommandSucceeded(connection_.execute("SET client_min_messages TO WARNING"));
 
     createTable();
 }
 
-void DataBase::disconnect() {
-    connection_.disconnect();
-}
+void DataBase::disconnect() { connection_.disconnect(); }
 
 void DataBase::warmUpCache() {
     Logger::instance().info("Warming up cache from PostgreSQL");
@@ -93,10 +90,8 @@ void DataBase::writeRecord(Task task) {
     task = normalizeTask(task);
 
     const std::vector<std::string> params{
-        std::to_string(task.firstValue),
-        std::to_string(task.secondValue),
-        std::string(1, task.operation),
-        std::to_string(task.result),
+        std::to_string(task.firstValue), std::to_string(task.secondValue),
+        std::string(1, task.operation),  std::to_string(task.result),
         std::to_string(task.status),
     };
 
@@ -113,22 +108,22 @@ void DataBase::writeRecord(Task task) {
 }
 
 void DataBase::createTable() {
-    const auto result = connection_.execute(
-        "CREATE TABLE IF NOT EXISTS calculation_history("
-        "id BIGSERIAL PRIMARY KEY,"
-        "first_value INTEGER NOT NULL,"
-        "second_value INTEGER NOT NULL,"
-        "operation CHAR(1) NOT NULL,"
-        "result INTEGER NOT NULL,"
-        "status INTEGER NOT NULL,"
-        "UNIQUE(first_value, second_value, operation)"
-        ")");
+    const auto result = connection_.execute("CREATE TABLE IF NOT EXISTS calculation_history("
+                                            "id BIGSERIAL PRIMARY KEY,"
+                                            "first_value INTEGER NOT NULL,"
+                                            "second_value INTEGER NOT NULL,"
+                                            "operation CHAR(1) NOT NULL,"
+                                            "result INTEGER NOT NULL,"
+                                            "status INTEGER NOT NULL,"
+                                            "UNIQUE(first_value, second_value, operation)"
+                                            ")");
     ensureCommandSucceeded(result);
 }
 
 std::string DataBase::connectionString() const {
-    return "host=" + config_.host + " port=" + std::to_string(config_.port) + " dbname=" + config_.database +
-           " user=" + config_.username + " password=" + config_.password;
+    return "host=" + config_.host + " port=" + std::to_string(config_.port) +
+           " dbname=" + config_.database + " user=" + config_.username +
+           " password=" + config_.password;
 }
 
 } // namespace calculator

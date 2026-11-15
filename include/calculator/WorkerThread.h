@@ -11,25 +11,25 @@ namespace calculator {
 // DataBase, Runner, io_context и сокеты живут только в этом потоке и уничтожаются в нём же:
 // после остановки сокеты закрыты, соединение с БД закрыто (PQfinish).
 class WorkerThread {
-public:
+  public:
     // config копируется в поле до старта потока и дальше используется только им.
-    WorkerThread(StopFlag& stopFlag, AppConfig config);
+    WorkerThread(StopFlag &stopFlag, AppConfig config);
     ~WorkerThread();
 
-    WorkerThread(const WorkerThread&) = delete;
-    WorkerThread& operator=(const WorkerThread&) = delete;
-    WorkerThread(WorkerThread&&) = delete;
-    WorkerThread& operator=(WorkerThread&&) = delete;
+    WorkerThread(const WorkerThread &) = delete;
+    WorkerThread &operator=(const WorkerThread &) = delete;
+    WorkerThread(WorkerThread &&) = delete;
+    WorkerThread &operator=(WorkerThread &&) = delete;
 
     void join();
 
     // Только после join(): join задаёт happens-before для exitCode_.
     int exitCode() const;
 
-private:
+  private:
     void run();
 
-    StopFlag& stopFlag_;
+    StopFlag &stopFlag_;
     AppConfig config_;
     int exitCode_{0};
     std::thread thread_; // последним: поток стартует, когда остальные поля готовы

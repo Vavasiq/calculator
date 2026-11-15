@@ -9,17 +9,17 @@ namespace calculator {
 
 // --- Subscription ---
 
-StopFlag::Subscription::Subscription(StopFlag& flag, std::uint64_t id) noexcept: flag_(flag), id_(id) {}
+StopFlag::Subscription::Subscription(StopFlag &flag, std::uint64_t id) noexcept
+    : flag_(flag), id_(id) {}
 
-StopFlag::Subscription::~Subscription() {
-    unsubscribe();
-}
+StopFlag::Subscription::~Subscription() { unsubscribe(); }
 
-StopFlag::Subscription::Subscription(Subscription&& other) noexcept: flag_(other.flag_), id_(other.id_) {
+StopFlag::Subscription::Subscription(Subscription &&other) noexcept
+    : flag_(other.flag_), id_(other.id_) {
     other.flag_.reset();
 }
 
-StopFlag::Subscription& StopFlag::Subscription::operator=(Subscription&& other) noexcept {
+StopFlag::Subscription &StopFlag::Subscription::operator=(Subscription &&other) noexcept {
     if (this != &other) {
         unsubscribe();
         flag_ = other.flag_;
@@ -67,7 +67,7 @@ void StopFlag::requestStop(StopReason reason, int signalNumber) {
     }
 
     // Вне мьютекса: колбэк может сам обращаться к StopFlag без самоблокировки.
-    for (const auto& entry : callbacks) {
+    for (const auto &entry : callbacks) {
         invokeCallback(entry.second);
     }
 
@@ -108,7 +108,7 @@ void StopFlag::unsubscribe(std::uint64_t id) {
     std::unique_lock<std::mutex> lock(mutex_);
 
     const auto it = std::find_if(callbacks_.begin(), callbacks_.end(),
-                                 [id](const auto& entry) { return entry.first == id; });
+                                 [id](const auto &entry) { return entry.first == id; });
     if (it != callbacks_.end()) {
         removed = std::move(it->second);
         callbacks_.erase(it);
@@ -118,13 +118,15 @@ void StopFlag::unsubscribe(std::uint64_t id) {
     // Колбэка в списке нет — его уже забрал requestStop. Если он ещё выполняется в другом
     // потоке, ждём: после выхода из unsubscribe колбэк не должен трогать объекты подписчика.
     // В том же потоке (колбэк отписывает сам себя) не ждём — иначе самоблокировка.
-    cv_.wait(lock, [this] { return !callbacksRunning_ || callbacksThread_ == std::this_thread::get_id(); });
+    cv_.wait(lock, [this] {
+        return !callbacksRunning_ || callbacksThread_ == std::this_thread::get_id();
+    });
 }
 
-void StopFlag::invokeCallback(const Callback& callback) noexcept {
+void StopFlag::invokeCallback(const Callback &callback) noexcept {
     try {
         callback();
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         Logger::instance().error(std::string("Stop callback threw: ") + e.what());
     } catch (...) {
         Logger::instance().error("Stop callback threw an unknown exception");

@@ -25,9 +25,12 @@ sigset_t terminationSignals() {
 
 std::string signalName(int signalNumber) {
     switch (signalNumber) {
-        case SIGINT: return "SIGINT";
-        case SIGTERM: return "SIGTERM";
-        default: return "signal " + std::to_string(signalNumber);
+    case SIGINT:
+        return "SIGINT";
+    case SIGTERM:
+        return "SIGTERM";
+    default:
+        return "signal " + std::to_string(signalNumber);
     }
 }
 
@@ -50,11 +53,10 @@ void SignalThread::ignoreBrokenPipe() {
     }
 }
 
-SignalThread::SignalThread(StopFlag& stopFlag): stopFlag_(stopFlag), thread_(&SignalThread::run, this) {}
+SignalThread::SignalThread(StopFlag &stopFlag)
+    : stopFlag_(stopFlag), thread_(&SignalThread::run, this) {}
 
-SignalThread::~SignalThread() {
-    stop();
-}
+SignalThread::~SignalThread() { stop(); }
 
 void SignalThread::stop() {
     if (!thread_.joinable()) {

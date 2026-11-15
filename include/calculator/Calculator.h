@@ -5,7 +5,7 @@
 namespace calculator {
 
 class Calculator {
-public:
+  public:
     Task calculate(Task task) const;
 };
 

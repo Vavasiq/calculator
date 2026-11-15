@@ -17,7 +17,7 @@ namespace calculator::test {
 namespace asio = boost::asio;
 using asio::ip::tcp;
 
-TestClient::TestClient(std::chrono::milliseconds timeout): timeout_(timeout), socket_(io_) {}
+TestClient::TestClient(std::chrono::milliseconds timeout) : timeout_(timeout), socket_(io_) {}
 
 void TestClient::run() {
     io_.restart();
@@ -34,7 +34,8 @@ void TestClient::run() {
 bool TestClient::connect(std::uint16_t port) {
     boost::system::error_code result = asio::error::would_block;
     const tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), port);
-    socket_.async_connect(endpoint, [&result](const boost::system::error_code& error) { result = error; });
+    socket_.async_connect(endpoint,
+                          [&result](const boost::system::error_code &error) { result = error; });
     run();
     if (result) {
         if (result != asio::error::operation_aborted) {
@@ -45,10 +46,11 @@ bool TestClient::connect(std::uint16_t port) {
     return true;
 }
 
-bool TestClient::sendRaw(const std::string& bytes) {
+bool TestClient::sendRaw(const std::string &bytes) {
     boost::system::error_code result = asio::error::would_block;
-    asio::async_write(socket_, asio::buffer(bytes),
-                      [&result](const boost::system::error_code& error, std::size_t) { result = error; });
+    asio::async_write(
+        socket_, asio::buffer(bytes),
+        [&result](const boost::system::error_code &error, std::size_t) { result = error; });
     run();
     if (result) {
         if (result != asio::error::operation_aborted) {
@@ -62,11 +64,12 @@ bool TestClient::sendRaw(const std::string& bytes) {
 std::optional<std::string> TestClient::readLine() {
     boost::system::error_code result = asio::error::would_block;
     std::size_t bytes = 0;
-    asio::async_read_until(socket_, buffer_, '\n',
-                           [&result, &bytes](const boost::system::error_code& error, std::size_t n) {
-                               result = error;
-                               bytes = n;
-                           });
+    asio::async_read_until(
+        socket_, buffer_, '\n',
+        [&result, &bytes](const boost::system::error_code &error, std::size_t n) {
+            result = error;
+            bytes = n;
+        });
     run();
     if (result) {
         if (result != asio::error::operation_aborted) {
@@ -76,7 +79,8 @@ std::optional<std::string> TestClient::readLine() {
     }
 
     const auto data = buffer_.data();
-    std::string line(asio::buffers_begin(data), asio::buffers_begin(data) + static_cast<std::ptrdiff_t>(bytes));
+    std::string line(asio::buffers_begin(data),
+                     asio::buffers_begin(data) + static_cast<std::ptrdiff_t>(bytes));
     buffer_.consume(bytes);
     line.pop_back(); // '\n'
     return line;
@@ -97,13 +101,13 @@ std::optional<Response> TestClient::readResponse() {
             response.error = json.at("error").get<std::string>();
         }
         return response;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         lastError_ = "bad response '" + *line + "': " + e.what();
         return std::nullopt;
     }
 }
 
-std::optional<Response> TestClient::request(const std::string& line) {
+std::optional<Response> TestClient::request(const std::string &line) {
     if (!sendRaw(line + "\n")) {
         return std::nullopt;
     }
@@ -125,8 +129,6 @@ void TestClient::close() {
     socket_.close(ignored);
 }
 
-std::string TestClient::lastError() const {
-    return lastError_;
-}
+std::string TestClient::lastError() const { return lastError_; }
 
 } // namespace calculator::test

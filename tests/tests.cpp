@@ -74,8 +74,9 @@ TEST(ParserTest, ThrowsOnIntOverflow) {
     EXPECT_THROW(p.parse(R"({"op":"+","a":3000000000,"b":1})"), std::invalid_argument);
     EXPECT_THROW(p.parse(R"({"op":"+","a":-3000000000,"b":1})"), std::invalid_argument);
     EXPECT_THROW(p.parse(R"({"op":"+","a":1,"b":2147483648})"), std::invalid_argument);
-    EXPECT_THROW(p.parse(R"({"op":"+","a":18446744073709551615,"b":1})"), std::invalid_argument); // uint64 max
-    EXPECT_THROW(p.parse(R"({"op":"+","a":1e30,"b":1})"), std::invalid_argument);                  // дробное
+    EXPECT_THROW(p.parse(R"({"op":"+","a":18446744073709551615,"b":1})"),
+                 std::invalid_argument);                                          // uint64 max
+    EXPECT_THROW(p.parse(R"({"op":"+","a":1e30,"b":1})"), std::invalid_argument); // дробное
     EXPECT_THROW(p.parse(R"({"op":"!","a":99999999999})"), std::invalid_argument);
 }
 
@@ -185,7 +186,7 @@ TEST(CalculatorTest, PowerOfOneWithHugeExponentIsFast) {
     EXPECT_EQ(zero.result, 0);
     EXPECT_EQ(minusOneEven.result, 1);
     EXPECT_EQ(minusOneOdd.result, -1);
-    for (const auto& task : {one, zero, minusOneEven, minusOneOdd}) {
+    for (const auto &task : {one, zero, minusOneEven, minusOneOdd}) {
         EXPECT_EQ(task.status, mathlib::MATH_OK);
     }
 
@@ -385,7 +386,8 @@ TEST(StopFlagTest, SubscriptionDestructorWaitsForRunningCallback) {
 
     // Окно с ограничением по времени: пока колбэк не отпущен, деструктор не должен вернуться.
     // Корректная реализация проходит всегда; без ожидания деструктор вернётся почти сразу.
-    const bool returnedTooEarly = waitUntil([&] { return destructorReturned.load(); }, milliseconds(100));
+    const bool returnedTooEarly =
+        waitUntil([&] { return destructorReturned.load(); }, milliseconds(100));
 
     release = true; // отпускаем колбэк в любом случае, чтобы потоки завершились
     destroyer.join();
@@ -474,7 +476,8 @@ TEST(ConfigTest, ServerSectionDefaults) {
 }
 
 TEST(ConfigTest, ThrowsOnInvalidServerSection) {
-    EXPECT_THROW(parseConfig(R"({"server": {"address": "localhost"}})"), std::invalid_argument); // не IP
+    EXPECT_THROW(parseConfig(R"({"server": {"address": "localhost"}})"),
+                 std::invalid_argument); // не IP
     EXPECT_THROW(parseConfig(R"({"server": {"address": "300.1.1.1"}})"), std::invalid_argument);
     EXPECT_THROW(parseConfig(R"({"server": {"address": 127}})"), std::invalid_argument);
     EXPECT_THROW(parseConfig(R"({"server": {"port": 0}})"), std::invalid_argument);
@@ -503,7 +506,8 @@ TEST(ProtocolTest, SerializesError) {
 TEST(ProtocolTest, InvalidUtf8InErrorDoesNotThrow) {
     // Текст ошибки разбора содержит фрагмент ввода клиента — там может быть что угодно.
     std::string serialized;
-    ASSERT_NO_THROW(serialized = serializeResponse({kStatusInvalidRequest, 0, "last read: '\xff'"}));
+    ASSERT_NO_THROW(serialized =
+                        serializeResponse({kStatusInvalidRequest, 0, "last read: '\xff'"}));
     EXPECT_NE(serialized.find("\xEF\xBF\xBD"), std::string::npos) << serialized; // U+FFFD
 }
 
@@ -549,7 +553,8 @@ TEST(RunnerTest, InvalidJsonGivesInvalidRequest) {
     InMemoryStorage storage;
     Runner runner(storage);
 
-    for (const char* request : {"not json", "", R"({"op":"+","a":1})", R"({"op":"%","a":1,"b":2})"}) {
+    for (const char *request :
+         {"not json", "", R"({"op":"+","a":1})", R"({"op":"%","a":1,"b":2})"}) {
         const auto response = runner.handle(request);
         EXPECT_EQ(response.status, kStatusInvalidRequest) << request;
         EXPECT_EQ(response.result, 0) << request;
@@ -577,7 +582,7 @@ TEST(RunnerTest, InvalidUtf8RequestGivesSerializableResponse) {
     InMemoryStorage storage;
     Runner runner(storage);
 
-    for (const char* request : {"\xff", "{\"op\":\"\xff\",\"a\":1,\"b\":2}"}) {
+    for (const char *request : {"\xff", "{\"op\":\"\xff\",\"a\":1,\"b\":2}"}) {
         const auto response = runner.handle(request);
         EXPECT_EQ(response.status, kStatusInvalidRequest);
         EXPECT_NO_THROW(serializeResponse(response));

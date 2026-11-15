@@ -9,47 +9,47 @@
 namespace calculator {
 
 class PgResult {
-public:
-    explicit PgResult(PGresult* result = nullptr);
+  public:
+    explicit PgResult(PGresult *result = nullptr);
 
-    PgResult(const PgResult&) = delete;
-    PgResult& operator=(const PgResult&) = delete;
-    PgResult(PgResult&&) noexcept = default;
-    PgResult& operator=(PgResult&&) noexcept = default;
+    PgResult(const PgResult &) = delete;
+    PgResult &operator=(const PgResult &) = delete;
+    PgResult(PgResult &&) noexcept = default;
+    PgResult &operator=(PgResult &&) noexcept = default;
 
     ExecStatusType status() const;
     int rows() const;
-    const char* value(int row, int column) const;
-    const char* errorMessage() const;
+    const char *value(int row, int column) const;
+    const char *errorMessage() const;
 
-private:
+  private:
     struct ResultDeleter {
-        void operator()(PGresult* result) const;
+        void operator()(PGresult *result) const;
     };
 
     std::unique_ptr<PGresult, ResultDeleter> result_;
 };
 
 class PgConnection {
-public:
+  public:
     PgConnection() = default;
     ~PgConnection() = default;
 
-    PgConnection(const PgConnection&) = delete;
-    PgConnection& operator=(const PgConnection&) = delete;
-    PgConnection(PgConnection&&) noexcept = default;
-    PgConnection& operator=(PgConnection&&) noexcept = default;
+    PgConnection(const PgConnection &) = delete;
+    PgConnection &operator=(const PgConnection &) = delete;
+    PgConnection(PgConnection &&) noexcept = default;
+    PgConnection &operator=(PgConnection &&) noexcept = default;
 
-    void connect(const std::string& connectionString);
+    void connect(const std::string &connectionString);
     void disconnect();
     bool isConnected() const;
 
-    PgResult execute(const std::string& query) const;
-    PgResult executeParams(const std::string& query, const std::vector<std::string>& params) const;
+    PgResult execute(const std::string &query) const;
+    PgResult executeParams(const std::string &query, const std::vector<std::string> &params) const;
 
-private:
+  private:
     struct ConnectionDeleter {
-        void operator()(PGconn* connection) const;
+        void operator()(PGconn *connection) const;
     };
 
     std::unique_ptr<PGconn, ConnectionDeleter> connection_;

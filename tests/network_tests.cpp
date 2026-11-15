@@ -40,8 +40,10 @@ using calculator::test::waitUntil;
 namespace {
 
 class ServerTest : public ::testing::Test {
-protected:
-    void SetUp() override { ASSERT_TRUE(server.waitUntilListening()) << "server did not start: " << server.error(); }
+  protected:
+    void SetUp() override {
+        ASSERT_TRUE(server.waitUntilListening()) << "server did not start: " << server.error();
+    }
 
     // Порядок важен: server уничтожается первым (stop + join), затем storage.
     InMemoryStorage storage;
@@ -90,17 +92,18 @@ TEST_F(ServerTest, InvalidRequestKeepsConnection) {
 
 TEST_F(ServerTest, SeveralRequestsOnOneConnection) {
     struct Case {
-        const char* request;
+        const char *request;
         int result;
     };
     const Case cases[] = {
-        {R"({"op":"+","a":7,"b":5})", 12},  {R"({"op":"-","a":7,"b":5})", 2},  {R"({"op":"*","a":7,"b":5})", 35},
-        {R"({"op":"/","a":7,"b":5})", 1},   {R"({"op":"^","a":2,"b":10})", 1024}, {R"({"op":"!","a":5})", 120},
+        {R"({"op":"+","a":7,"b":5})", 12},    {R"({"op":"-","a":7,"b":5})", 2},
+        {R"({"op":"*","a":7,"b":5})", 35},    {R"({"op":"/","a":7,"b":5})", 1},
+        {R"({"op":"^","a":2,"b":10})", 1024}, {R"({"op":"!","a":5})", 120},
     };
 
     TestClient client;
     ASSERT_TRUE(client.connect(server.port())) << client.lastError();
-    for (const auto& testCase : cases) {
+    for (const auto &testCase : cases) {
         const auto response = client.request(testCase.request);
         ASSERT_TRUE(response) << testCase.request << ": " << client.lastError();
         EXPECT_EQ(response->status, mathlib::MATH_OK) << testCase.request;
@@ -113,7 +116,9 @@ TEST_F(ServerTest, PipelinedRequests) {
     ASSERT_TRUE(client.connect(server.port())) << client.lastError();
 
     // Две строки одним write, вторая — с CRLF (nc/telnet): два ответа в том же порядке.
-    ASSERT_TRUE(client.sendRaw("{\"op\":\"*\",\"a\":6,\"b\":7}\n{\"op\":\"-\",\"a\":1,\"b\":10}\r\n")) << client.lastError();
+    ASSERT_TRUE(
+        client.sendRaw("{\"op\":\"*\",\"a\":6,\"b\":7}\n{\"op\":\"-\",\"a\":1,\"b\":10}\r\n"))
+        << client.lastError();
 
     const auto first = client.readResponse();
     ASSERT_TRUE(first) << client.lastError();
@@ -145,9 +150,11 @@ TEST_F(ServerTest, TooLongRequestClosesConnection) {
     TestClient client;
     ASSERT_TRUE(client.connect(server.port())) << client.lastError();
 
-    ASSERT_TRUE(client.sendRaw(std::string(5000, 'x'))) << client.lastError(); // без '\n', больше kMaxRequestSize
+    ASSERT_TRUE(client.sendRaw(std::string(5000, 'x')))
+        << client.lastError(); // без '\n', больше kMaxRequestSize
     const auto response = client.readResponse();
-    ASSERT_TRUE(response) << "response lost (RST instead of graceful close?): " << client.lastError();
+    ASSERT_TRUE(response) << "response lost (RST instead of graceful close?): "
+                          << client.lastError();
     EXPECT_EQ(response->status, kStatusInvalidRequest);
     EXPECT_EQ(response->error, "Request too long");
     EXPECT_TRUE(client.waitForServerClose()) << client.lastError();
@@ -206,7 +213,8 @@ TEST_F(ServerTest, HeavyInputsAnsweredOverNetwork) {
     TestClient client;
     ASSERT_TRUE(client.connect(server.port())) << client.lastError();
 
-    const auto factorial = client.request(R"({"op":"!","a":100000000})"); // раньше: переполнение стека
+    const auto factorial =
+        client.request(R"({"op":"!","a":100000000})"); // раньше: переполнение стека
     ASSERT_TRUE(factorial) << client.lastError();
     EXPECT_EQ(factorial->status, mathlib::MATH_OVERFLOW);
 
@@ -215,7 +223,8 @@ TEST_F(ServerTest, HeavyInputsAnsweredOverNetwork) {
     EXPECT_EQ(power->status, mathlib::MATH_OK);
     EXPECT_EQ(power->result, 1);
 
-    const auto overflow = client.request(R"({"op":"+","a":3000000000,"b":1})"); // раньше: молча другое число
+    const auto overflow =
+        client.request(R"({"op":"+","a":3000000000,"b":1})"); // раньше: молча другое число
     ASSERT_TRUE(overflow) << client.lastError();
     EXPECT_EQ(overflow->status, kStatusInvalidRequest);
 
@@ -236,12 +245,14 @@ TEST(ServerStopTest, StopBeforeRunIsNotLost) {
     std::atomic<bool> listened{false};
     std::atomic<bool> finished{false};
     std::thread serverThread([&] {
-        runServer({"127.0.0.1", 0}, runner, stopFlag, [&](const boost::asio::ip::tcp::endpoint&) { listened = true; });
+        runServer({"127.0.0.1", 0}, runner, stopFlag,
+                  [&](const boost::asio::ip::tcp::endpoint &) { listened = true; });
         finished = true;
     });
 
     // Если правило нарушено, runServer не вернётся, и тест оборвёт TIMEOUT ctest.
-    EXPECT_TRUE(waitUntil([&] { return finished.load(); }, kTestTimeout)) << "runServer ignored an earlier stop";
+    EXPECT_TRUE(waitUntil([&] { return finished.load(); }, kTestTimeout))
+        << "runServer ignored an earlier stop";
     serverThread.join();
     EXPECT_TRUE(listened.load());
 }
@@ -250,7 +261,7 @@ TEST(ServerStopTest, StopBeforeRunIsNotLost) {
 
 TEST(IntegrationTest, RealDatabaseOverNetwork) {
     DataBase::Config config; // встроенные значения — те же, что у сервиса на ВМ
-    if (const char* path = std::getenv("CALCULATOR_TEST_CONFIG")) {
+    if (const char *path = std::getenv("CALCULATOR_TEST_CONFIG")) {
         config = loadConfig(path).database;
     }
 
@@ -260,7 +271,7 @@ TEST(IntegrationTest, RealDatabaseOverNetwork) {
     try {
         dataBase.connect();
         dataBase.warmUpCache();
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         GTEST_SKIP() << "PostgreSQL unavailable: " << e.what();
     }
 

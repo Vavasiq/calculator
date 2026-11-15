@@ -21,26 +21,27 @@ namespace calculator::test {
 // операция отменяется и метод возвращает «неудачу» — тест падает, а не висит.
 // Это не sleep: run_for возвращается, как только операция завершилась.
 class TestClient {
-public:
+  public:
     explicit TestClient(std::chrono::milliseconds timeout = kTestTimeout);
 
-    TestClient(const TestClient&) = delete;
-    TestClient& operator=(const TestClient&) = delete;
+    TestClient(const TestClient &) = delete;
+    TestClient &operator=(const TestClient &) = delete;
 
     // Одна попытка подключения к 127.0.0.1:port. Готовность сервера ждёт TestServer.
     bool connect(std::uint16_t port);
 
     // Отправить байты как есть (без добавления '\n').
-    bool sendRaw(const std::string& bytes);
+    bool sendRaw(const std::string &bytes);
 
-    // Прочитать одну строку ответа без '\n'. std::nullopt — EOF, ошибка или таймаут (см. lastError).
+    // Прочитать одну строку ответа без '\n'. std::nullopt — EOF, ошибка или таймаут (см.
+    // lastError).
     std::optional<std::string> readLine();
 
     // Прочитать строку и разобрать её как JSON-ответ протокола.
     std::optional<Response> readResponse();
 
     // sendRaw(line + '\n') + readResponse().
-    std::optional<Response> request(const std::string& line);
+    std::optional<Response> request(const std::string &line);
 
     // true, если сервер закрыл соединение (EOF/reset) в пределах таймаута, не прислав данных.
     bool waitForServerClose();
@@ -50,7 +51,7 @@ public:
     // Описание последней ошибки — для сообщений в ASSERT/EXPECT.
     std::string lastError() const;
 
-private:
+  private:
     // Крутит io_ до завершения операции или таймаута; при таймауте закрывает сокет,
     // чтобы операция завершилась с operation_aborted.
     void run();

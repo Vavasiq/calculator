@@ -9,9 +9,9 @@
 
 namespace calculator {
 
-Runner::Runner(TaskStorage& storage): storage_(storage) {}
+Runner::Runner(TaskStorage &storage) : storage_(storage) {}
 
-Response Runner::handle(const std::string& requestLine) {
+Response Runner::handle(const std::string &requestLine) {
     try {
         Task task = parser_.parse(requestLine);
         checker_.check(task);
@@ -32,11 +32,11 @@ Response Runner::handle(const std::string& requestLine) {
         const std::string message = statusMessage(task.status);
         Logger::instance().info("Math error: " + message);
         return Response{task.status, 0, message};
-    } catch (const std::invalid_argument& e) {
+    } catch (const std::invalid_argument &e) {
         // Parser и Checker сообщают о некорректном запросе через invalid_argument.
         Logger::instance().warn(std::string("Invalid request: ") + e.what());
         return Response{kStatusInvalidRequest, 0, e.what()};
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         // Например, сбой записи в БД. Детали — только в лог, клиенту без подробностей.
         Logger::instance().error(std::string("Internal error: ") + e.what());
         return Response{kStatusInternalError, 0, statusMessage(kStatusInternalError)};

@@ -15,22 +15,24 @@ namespace calculator {
 namespace {
 
 // Ключ отсутствует -> target не меняется (остаётся значение по умолчанию).
-void readString(const nlohmann::json& section, const char* key, const std::string& fullName, std::string& target) {
+void readString(const nlohmann::json &section, const char *key, const std::string &fullName,
+                std::string &target) {
     if (!section.contains(key)) {
         return;
     }
-    const auto& value = section.at(key);
+    const auto &value = section.at(key);
     if (!value.is_string()) {
         throw std::invalid_argument("Config field '" + fullName + "' must be a string");
     }
     target = value.get<std::string>();
 }
 
-void readPort(const nlohmann::json& section, const char* key, const std::string& fullName, std::uint16_t& target) {
+void readPort(const nlohmann::json &section, const char *key, const std::string &fullName,
+              std::uint16_t &target) {
     if (!section.contains(key)) {
         return;
     }
-    const auto& value = section.at(key);
+    const auto &value = section.at(key);
     if (!value.is_number_integer()) {
         throw std::invalid_argument("Config field '" + fullName + "' must be an integer");
     }
@@ -43,11 +45,11 @@ void readPort(const nlohmann::json& section, const char* key, const std::string&
 
 } // namespace
 
-AppConfig parseConfig(const std::string& json) {
+AppConfig parseConfig(const std::string &json) {
     nlohmann::json root;
     try {
         root = nlohmann::json::parse(json);
-    } catch (const nlohmann::json::parse_error& e) {
+    } catch (const nlohmann::json::parse_error &e) {
         throw std::invalid_argument(std::string("Config JSON parse error: ") + e.what());
     }
 
@@ -58,7 +60,7 @@ AppConfig parseConfig(const std::string& json) {
     AppConfig config;
 
     if (root.contains("database")) {
-        const auto& database = root.at("database");
+        const auto &database = root.at("database");
         if (!database.is_object()) {
             throw std::invalid_argument("Config field 'database' must be an object");
         }
@@ -70,26 +72,28 @@ AppConfig parseConfig(const std::string& json) {
     }
 
     if (root.contains("server")) {
-        const auto& server = root.at("server");
+        const auto &server = root.at("server");
         if (!server.is_object()) {
             throw std::invalid_argument("Config field 'server' must be an object");
         }
         readString(server, "address", "server.address", config.server.address);
         readPort(server, "port", "server.port", config.server.port);
 
-        // Проверяем адрес здесь, а не при bind: ошибка конфига отсекается в main до запуска потоков.
+        // Проверяем адрес здесь, а не при bind: ошибка конфига отсекается в main до запуска
+        // потоков.
         boost::system::error_code error;
         boost::asio::ip::make_address(config.server.address, error);
         if (error) {
-            throw std::invalid_argument("Config field 'server.address' is not a valid IP address: '" +
-                                        config.server.address + "'");
+            throw std::invalid_argument(
+                "Config field 'server.address' is not a valid IP address: '" +
+                config.server.address + "'");
         }
     }
 
     return config;
 }
 
-AppConfig loadConfig(const std::string& path) {
+AppConfig loadConfig(const std::string &path) {
     std::ifstream file(path);
     if (!file) {
         throw std::runtime_error("Cannot open config file: " + path);
@@ -100,7 +104,7 @@ AppConfig loadConfig(const std::string& path) {
 
     try {
         return parseConfig(content.str());
-    } catch (const std::invalid_argument& e) {
+    } catch (const std::invalid_argument &e) {
         throw std::invalid_argument(path + ": " + e.what());
     }
 }

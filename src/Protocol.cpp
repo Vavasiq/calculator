@@ -7,17 +7,24 @@ namespace calculator {
 
 std::string statusMessage(int status) {
     switch (status) {
-        case mathlib::MATH_OK: return "OK";
-        case mathlib::MATH_OVERFLOW: return "Integer overflow";
-        case mathlib::MATH_DIV0: return "Division by zero";
-        case mathlib::MATH_DOMAIN: return "Value out of domain";
-        case kStatusInvalidRequest: return "Invalid request";
-        case kStatusInternalError: return "Internal error";
-        default: return "Unknown error";
+    case mathlib::MATH_OK:
+        return "OK";
+    case mathlib::MATH_OVERFLOW:
+        return "Integer overflow";
+    case mathlib::MATH_DIV0:
+        return "Division by zero";
+    case mathlib::MATH_DOMAIN:
+        return "Value out of domain";
+    case kStatusInvalidRequest:
+        return "Invalid request";
+    case kStatusInternalError:
+        return "Internal error";
+    default:
+        return "Unknown error";
     }
 }
 
-std::string serializeResponse(const Response& response) {
+std::string serializeResponse(const Response &response) {
     nlohmann::json json;
     json["status"] = response.status;
     json["result"] = response.result;

@@ -24,18 +24,19 @@ namespace calculator::test {
 // Всё, что тест читает из потока сервера, — атомики (port_, finished_) или читается после
 // finished_ (error_): синхронизацию через сокет TSan не видит.
 class TestServer {
-public:
+  public:
     // Хранилищем не владеет: оно должно пережить TestServer.
-    explicit TestServer(TaskStorage& storage): runner_(storage), thread_([this] { run(); }) {}
+    explicit TestServer(TaskStorage &storage) : runner_(storage), thread_([this] { run(); }) {}
 
     ~TestServer() { stop(); }
 
-    TestServer(const TestServer&) = delete;
-    TestServer& operator=(const TestServer&) = delete;
+    TestServer(const TestServer &) = delete;
+    TestServer &operator=(const TestServer &) = delete;
 
     // Busy-цикл с таймаутом до момента, когда сервер начал слушать (после listen).
     bool waitUntilListening(std::chrono::milliseconds timeout = kTestTimeout) const {
-        return waitUntil([this] { return port_.load() != 0 || finished_.load(); }, timeout) && port_.load() != 0;
+        return waitUntil([this] { return port_.load() != 0 || finished_.load(); }, timeout) &&
+               port_.load() != 0;
     }
 
     std::uint16_t port() const { return port_.load(); }
@@ -55,12 +56,14 @@ public:
         }
     }
 
-private:
+  private:
     void run() {
         try {
             runServer({"127.0.0.1", 0}, runner_, stopFlag_,
-                      [this](const boost::asio::ip::tcp::endpoint& endpoint) { port_ = endpoint.port(); });
-        } catch (const std::exception& e) {
+                      [this](const boost::asio::ip::tcp::endpoint &endpoint) {
+                          port_ = endpoint.port();
+                      });
+        } catch (const std::exception &e) {
             error_ = e.what();
         } catch (...) {
             error_ = "unknown exception";

@@ -8,7 +8,7 @@
 namespace calculator {
 
 // Путь, по которому сервис ищет конфиг, если --config не задан.
-inline constexpr const char* kDefaultConfigPath = "/etc/calculator/calculator.json";
+inline constexpr const char *kDefaultConfigPath = "/etc/calculator/calculator.json";
 
 // Конфигурация приложения верхнего уровня.
 struct AppConfig {
@@ -24,10 +24,10 @@ struct AppConfig {
 //   "database": { "host": "...", "port": 5432, "name": "...", "user": "...", "password": "..." },
 //   "server":   { "address": "127.0.0.1", "port": 7777 }
 // }
-AppConfig parseConfig(const std::string& json);
+AppConfig parseConfig(const std::string &json);
 
 // Читает файл и разбирает его через parseConfig. Ошибки содержат путь к файлу:
 // не удалось открыть -> std::runtime_error, неверное содержимое -> std::invalid_argument.
-AppConfig loadConfig(const std::string& path);
+AppConfig loadConfig(const std::string &path);
 
 } // namespace calculator

@@ -17,7 +17,7 @@ constexpr int kMaxFactorialArgument = 12;
 
 // mathlib::fact рекурсивна на глубину n: {"op":"!","a":100000000} переполнил бы стек
 // рабочего потока (SIGSEGV). При n > 12 ответ заведомо MATH_OVERFLOW — без рекурсии.
-int factorial(int n, int& out) {
+int factorial(int n, int &out) {
     if (n > kMaxFactorialArgument) {
         return mathlib::MATH_OVERFLOW;
     }
@@ -27,13 +27,20 @@ int factorial(int n, int& out) {
 // mathlib::powi крутит цикл exp раз: для оснований 0, 1, -1 переполнения не бывает,
 // и exp = 2000000000 занял бы рабочий поток на секунды. Эти основания считаем сразу.
 // При |base| >= 2 переполнение наступает не позже чем за 32 итерации.
-int power(int base, int exp, int& out) {
+int power(int base, int exp, int &out) {
     if (exp >= 0) {
         switch (base) {
-            case 1: out = 1; return mathlib::MATH_OK;
-            case 0: out = exp == 0 ? 1 : 0; return mathlib::MATH_OK;
-            case -1: out = exp % 2 == 0 ? 1 : -1; return mathlib::MATH_OK;
-            default: break;
+        case 1:
+            out = 1;
+            return mathlib::MATH_OK;
+        case 0:
+            out = exp == 0 ? 1 : 0;
+            return mathlib::MATH_OK;
+        case -1:
+            out = exp % 2 == 0 ? 1 : -1;
+            return mathlib::MATH_OK;
+        default:
+            break;
         }
     }
     return mathlib::powi(base, exp, out); // exp < 0 -> MATH_DOMAIN, как и раньше
@@ -48,13 +55,26 @@ Task Calculator::calculate(Task task) const {
     int status = mathlib::MATH_DOMAIN;
 
     switch (task.operation) {
-        case '+': status = mathlib::safe_add(task.firstValue, task.secondValue, result); break;
-        case '-': status = mathlib::safe_sub(task.firstValue, task.secondValue, result); break;
-        case '*': status = mathlib::safe_mul(task.firstValue, task.secondValue, result); break;
-        case '/': status = mathlib::safe_div(task.firstValue, task.secondValue, result); break;
-        case '^': status = power(task.firstValue, task.secondValue, result); break;
-        case '!': status = factorial(task.firstValue, result); break;
-        default: break;
+    case '+':
+        status = mathlib::safe_add(task.firstValue, task.secondValue, result);
+        break;
+    case '-':
+        status = mathlib::safe_sub(task.firstValue, task.secondValue, result);
+        break;
+    case '*':
+        status = mathlib::safe_mul(task.firstValue, task.secondValue, result);
+        break;
+    case '/':
+        status = mathlib::safe_div(task.firstValue, task.secondValue, result);
+        break;
+    case '^':
+        status = power(task.firstValue, task.secondValue, result);
+        break;
+    case '!':
+        status = factorial(task.firstValue, result);
+        break;
+    default:
+        break;
     }
 
     task.status = status;

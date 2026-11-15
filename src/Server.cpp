@@ -20,11 +20,12 @@ using asio::ip::tcp;
 
 namespace {
 
-std::string toString(const tcp::endpoint& endpoint) {
+std::string toString(const tcp::endpoint &endpoint) {
     return endpoint.address().to_string() + ":" + std::to_string(endpoint.port());
 }
 
-void throwIfFailed(const boost::system::error_code& error, const char* action, const ServerConfig& config) {
+void throwIfFailed(const boost::system::error_code &error, const char *action,
+                   const ServerConfig &config) {
     if (error) {
         throw std::runtime_error(std::string("Cannot ") + action + " " + config.address + ":" +
                                  std::to_string(config.port) + ": " + error.message());
@@ -33,7 +34,7 @@ void throwIfFailed(const boost::system::error_code& error, const char* action, c
 
 } // namespace
 
-Server::Server(asio::io_context& io, const ServerConfig& config, Runner& runner)
+Server::Server(asio::io_context &io, const ServerConfig &config, Runner &runner)
     : runner_(runner), acceptor_(io), socket_(io), buffer_(kMaxRequestSize) {
     boost::system::error_code error;
     const auto address = asio::ip::make_address(config.address, error);
@@ -53,15 +54,14 @@ Server::Server(asio::io_context& io, const ServerConfig& config, Runner& runner)
     startAccept();
 }
 
-tcp::endpoint Server::localEndpoint() const {
-    return acceptor_.local_endpoint();
-}
+tcp::endpoint Server::localEndpoint() const { return acceptor_.local_endpoint(); }
 
 void Server::startAccept() {
-    acceptor_.async_accept(socket_, [this](const boost::system::error_code& error) { onAccept(error); });
+    acceptor_.async_accept(socket_,
+                           [this](const boost::system::error_code &error) { onAccept(error); });
 }
 
-void Server::onAccept(const boost::system::error_code& error) {
+void Server::onAccept(const boost::system::error_code &error) {
     if (error == asio::error::operation_aborted) {
         return; // остановка
     }
@@ -81,10 +81,12 @@ void Server::onAccept(const boost::system::error_code& error) {
 
 void Server::startRead() {
     asio::async_read_until(socket_, buffer_, '\n',
-                           [this](const boost::system::error_code& error, std::size_t bytes) { onRead(error, bytes); });
+                           [this](const boost::system::error_code &error, std::size_t bytes) {
+                               onRead(error, bytes);
+                           });
 }
 
-void Server::onRead(const boost::system::error_code& error, std::size_t bytes) {
+void Server::onRead(const boost::system::error_code &error, std::size_t bytes) {
     if (error == asio::error::operation_aborted) {
         return;
     }
@@ -103,9 +105,11 @@ void Server::onRead(const boost::system::error_code& error, std::size_t bytes) {
         return;
     }
 
-    // Ровно одна строка вместе с '\n'; остаток (pipelining) остаётся в буфере для следующего чтения.
+    // Ровно одна строка вместе с '\n'; остаток (pipelining) остаётся в буфере для следующего
+    // чтения.
     const auto data = buffer_.data();
-    std::string line(asio::buffers_begin(data), asio::buffers_begin(data) + static_cast<std::ptrdiff_t>(bytes));
+    std::string line(asio::buffers_begin(data),
+                     asio::buffers_begin(data) + static_cast<std::ptrdiff_t>(bytes));
     buffer_.consume(bytes);
 
     line.pop_back(); // '\n'
@@ -116,15 +120,16 @@ void Server::onRead(const boost::system::error_code& error, std::size_t bytes) {
     sendResponse(serializeResponse(runner_.handle(line)), false);
 }
 
-void Server::sendResponse(const std::string& json, bool closeAfterWrite) {
+void Server::sendResponse(const std::string &json, bool closeAfterWrite) {
     response_ = json + '\n';
-    asio::async_write(socket_, asio::buffer(response_),
-                      [this, closeAfterWrite](const boost::system::error_code& error, std::size_t /*bytes*/) {
-                          onWrite(error, closeAfterWrite);
-                      });
+    asio::async_write(
+        socket_, asio::buffer(response_),
+        [this, closeAfterWrite](const boost::system::error_code &error, std::size_t /*bytes*/) {
+            onWrite(error, closeAfterWrite);
+        });
 }
 
-void Server::onWrite(const boost::system::error_code& error, bool closeAfterWrite) {
+void Server::onWrite(const boost::system::error_code &error, bool closeAfterWrite) {
     if (error == asio::error::operation_aborted) {
         return;
     }
@@ -144,7 +149,7 @@ void Server::onWrite(const boost::system::error_code& error, bool closeAfterWrit
 
 void Server::startDrain() {
     socket_.async_read_some(asio::buffer(drainBuffer_),
-                            [this](const boost::system::error_code& error, std::size_t /*bytes*/) {
+                            [this](const boost::system::error_code &error, std::size_t /*bytes*/) {
                                 if (error == asio::error::operation_aborted) {
                                     return;
                                 }
@@ -156,7 +161,7 @@ void Server::startDrain() {
                             });
 }
 
-void Server::closeSession(const std::string& reason) {
+void Server::closeSession(const std::string &reason) {
     Logger::instance().info(reason + ": " + clientName_);
 
     boost::system::error_code ignored;
@@ -169,7 +174,8 @@ void Server::closeSession(const std::string& reason) {
     startAccept(); // один клиент за раз: следующего принимаем только сейчас
 }
 
-void runServer(const ServerConfig& config, Runner& runner, StopFlag& stopFlag, const ListeningCallback& onListening) {
+void runServer(const ServerConfig &config, Runner &runner, StopFlag &stopFlag,
+               const ListeningCallback &onListening) {
     // Порядок важен (план, раздел 5): уничтожение в обратном порядке, поэтому подписка
     // снимается первой, и ни один колбэк уже не тронет io после выхода из функции.
     asio::io_context io;

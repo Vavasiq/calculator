@@ -17,25 +17,19 @@ struct Logger::Impl {
     }
 };
 
-Logger::Logger(): impl_(std::make_unique<Impl>()) {}
+Logger::Logger() : impl_(std::make_unique<Impl>()) {}
 
 Logger::~Logger() = default;
 
-Logger& Logger::instance() {
+Logger &Logger::instance() {
     static Logger inst;
     return inst;
 }
 
-void Logger::info(const std::string& msg) {
-    impl_->logger->info(msg);
-}
+void Logger::info(const std::string &msg) { impl_->logger->info(msg); }
 
-void Logger::warn(const std::string& msg) {
-    impl_->logger->warn(msg);
-}
+void Logger::warn(const std::string &msg) { impl_->logger->warn(msg); }
 
-void Logger::error(const std::string& msg) {
-    impl_->logger->error(msg);
-}
+void Logger::error(const std::string &msg) { impl_->logger->error(msg); }
 
 } // namespace calculator
