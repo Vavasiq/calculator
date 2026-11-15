@@ -11,10 +11,13 @@ set(CPACK_PACKAGE_NAME "calculator")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 # lintian: краткое описание не должно начинаться с имени пакета; развёрнутое — не пустое.
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "TCP service for integer calculations with PostgreSQL storage")
-set(CPACK_PACKAGE_DESCRIPTION
-    "Accepts calculation tasks as JSON lines over TCP (Boost.Asio) and returns JSON results. "
-    "Results are stored in PostgreSQL and cached in memory. Runs as the systemd service "
-    "calculator.service under the dedicated system user 'calculator'.")
+# Одна строка (string(CONCAT), а не несколько аргументов set(), иначе CMake склеит их через ';').
+# Явные '\n': по правилам Debian строки развёрнутого описания не длиннее 80 символов.
+string(CONCAT CPACK_PACKAGE_DESCRIPTION
+    "Accepts calculation tasks as JSON lines over TCP (Boost.Asio) and\n"
+    "returns JSON results. Results are stored in PostgreSQL and cached in\n"
+    "memory. Runs as the systemd service calculator.service under the\n"
+    "dedicated system user 'calculator'.")
 set(CPACK_PACKAGE_CONTACT "Vavasiq <vavasiq@example.com>")
 
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
