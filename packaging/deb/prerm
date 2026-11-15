@@ -1,0 +1,28 @@
+#!/bin/sh
+# prerm пакета calculator (план: docs/task4-4-deb.md, раздел 4).
+set -e
+
+case "$1" in
+    remove | deconfigure)
+        # Штатная остановка до удаления файлов: SIGTERM -> поток сигналов -> io_context::stop()
+        # -> закрытие соединения с БД (задачи 1 и 3).
+        if [ -d /run/systemd/system ]; then
+            systemctl stop calculator.service || true
+        fi
+        # disable работает и без запущенного systemd (правит только symlink'и).
+        if command -v systemctl >/dev/null; then
+            systemctl disable --quiet calculator.service || true
+        fi
+        ;;
+
+    upgrade | failed-upgrade)
+        # Сервис не останавливаем: postinst новой версии сделает try-restart.
+        ;;
+
+    *)
+        echo "prerm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
