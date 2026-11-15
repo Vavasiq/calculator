@@ -105,7 +105,7 @@ cd build-deb && cpack            # -> calculator_1.0.0_amd64.deb
 - `purge`: конфиг и пустую `/etc/calculator` dpkg удаляет сам, это conffile. **Пользователя `calculator` не удаляем**, так рекомендует политика Debian: после него могут остаться файлы, а повторное создание выдало бы другой UID.
 
 ### Чего пакет не делает
-- **Не создаёт базу и роль PostgreSQL.** Это настройка конкретного окружения, и БД может быть на другом хосте. Команды для этого шага (`CREATE USER` и `CREATE DATABASE` из ДЗ-3) в README и в подсказке `postinst`.
+- **Не создаёт базу и роль PostgreSQL.** Это настройка конкретного окружения, и БД может быть на другом хосте. Команды `CREATE USER` и `CREATE DATABASE` есть в [README](../README.md#база-данных-и-роль-postgresql). `postinst` после первой установки напоминает настроить доступ к БД в конфиге и включить сервис.
 
 ## 5. Ручная установка из задачи 2 на ВМ
 
@@ -155,6 +155,11 @@ lintian "$DEB" || true # для информации
 ```
 
 ### 2. Установка и запуск
+Сервис начинает слушать порт не сразу после `systemctl start`: сначала он подключается к БД и прогревает кеш (`Type=simple`). Поэтому перед запросом через `nc` ждём порт:
+```bash
+waitport() { timeout 30 sh -c "until nc -z 127.0.0.1 $1; do sleep 0.2; done"; }
+```
+
 ```bash
 # сначала убрать ручную установку (раздел 5)
 sudo apt install ./"$DEB"
@@ -162,6 +167,7 @@ dpkg -s calculator | grep -E 'Status|Version'                   # install ok ins
 stat -c '%U:%G %a' /etc/calculator/calculator.json              # root:calculator 640
 systemctl cat calculator | head -1                              # /usr/lib/systemd/system/calculator.service
 sudo systemctl enable --now calculator && systemctl is-active calculator
+waitport 7777
 printf '{"op":"*","a":6,"b":7}\n' | nc -N 127.0.0.1 7777        # {"result":42,"status":0}
 sudo systemctl restart calculator && sudo systemctl stop calculator && sudo systemctl start calculator
 journalctl -u calculator -n 20 --no-pager
@@ -171,9 +177,10 @@ journalctl -u calculator -n 20 --no-pager
 ```bash
 sudo sed -i 's/"port": 7777/"port": 7779/' /etc/calculator/calculator.json
 sudo apt install --reinstall ./"$DEB"
-grep '"port": 7779' /etc/calculator/calculator.json            # правка на месте
+sudo grep '"port": 7779' /etc/calculator/calculator.json       # правка на месте (файл 0640, читать через sudo)
 stat -c '%U:%G %a' /etc/calculator/calculator.json              # root:calculator 640
 systemctl is-active calculator                                  # active: try-restart, сервис слушает 7779
+waitport 7779
 printf '{"op":"+","a":1,"b":2}\n' | nc -N 127.0.0.1 7779
 sudo sed -i 's/"port": 7779/"port": 7777/' /etc/calculator/calculator.json && sudo systemctl restart calculator
 ```
@@ -182,7 +189,7 @@ sudo sed -i 's/"port": 7779/"port": 7777/' /etc/calculator/calculator.json && su
 ```bash
 sudo apt remove -y calculator
 systemctl is-active calculator; ls /usr/bin/calculator          # inactive; файла нет
-ls /etc/calculator/calculator.json                              # конфиг остался (conffile)
+sudo ls -l /etc/calculator/calculator.json                      # конфиг остался (conffile)
 sudo apt purge -y calculator
 ls /etc/calculator 2>&1                                         # каталога нет
 getent passwd calculator                                        # пользователь остался (раздел 4)

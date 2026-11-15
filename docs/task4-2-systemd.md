@@ -14,6 +14,10 @@
 
 **Опора на задачу 1:** `systemctl stop` шлёт `SIGTERM`. Поток сигналов принимает его, рабочий поток закрывает соединение, и процесс выходит с кодом `0`. Это уже проверено вручную через `kill -TERM`. Запуск без аргументов (режим сервиса) тоже уже поддержан.
 
+> **Что изменилось в следующих задачах.** План описывает состояние на момент задачи 2. Unit-файл, правила установки и загрузка конфига остались как здесь. Изменилось:
+> - **задача 3:** в конфиге появилась секция `server` (`address`, `port`, по умолчанию `127.0.0.1:7777`). Позиционный аргумент с JSON-заданием удалён, формат запуска `calculator [--config <путь>]`. `WorkerThread` получает весь `AppConfig`, `Runner` — хранилище (`TaskStorage`), а не конфиг БД. `Printer` удалён ([task4-3](task4-3-network.md));
+> - **задача 4:** при установке deb-пакетом пользователя `calculator` создаёт `postinst`, он же выставляет `root:calculator 0640` на конфиг. Конфиг помечен как conffile. Пакет ставится с префиксом `/usr`: бинарник в `/usr/bin`, unit-файл в `/usr/lib/systemd/system` ([task4-4](task4-4-deb.md)). Ручная установка из этого плана перед установкой пакета убирается (раздел 5 в task4-4).
+
 ---
 
 ## 1. Unit-файл
@@ -180,10 +184,12 @@ systemd-analyze verify /usr/local/lib/systemd/system/calculator.service   # пу
 
 ### 4. `Restart=on-failure`
 
+Сигналы посылаются через `systemctl kill`, а не через `kill $(systemctl show -p MainPID ...)`. Если сервис не запущен, `MainPID` равен `0`, и `kill 0` ударил бы по всей группе процессов вызывающего терминала. Мы на это наступили при проверке. `systemctl kill` в таком случае просто ничего не делает.
+
 | Сценарий | Команды | Ожидание |
 |---|---|---|
-| Падение процесса | `sudo kill -KILL $(systemctl show -p MainPID --value calculator)` | Через 5 с сервис снова `active`, в журнале `Scheduled restart job, restart counter is at 1` |
-| Штатный выход не перезапускается | `sudo kill -TERM $(systemctl show -p MainPID --value calculator)` | Сервис `inactive (dead)`, перезапуска нет: код выхода `0` |
+| Падение процесса | `sudo systemctl kill --kill-whom=main --signal=SIGKILL calculator` | Через 5 с сервис снова `active`, в журнале `Scheduled restart job, restart counter is at 1` |
+| Штатный выход не перезапускается | `sudo systemctl kill --kill-whom=main --signal=SIGTERM calculator` | Сервис `inactive (dead)`, перезапуска нет: код выхода `0` |
 | Нет БД, потом появилась | `sudo pg_ctlcluster 16 main stop`<br>`sudo systemctl start calculator`<br>через ~10 с `sudo pg_ctlcluster 16 main start` | В журнале `Connection refused`, `exit 1`, несколько `Scheduled restart job`. После запуска кластера очередная попытка успешна, сервис `active` |
 | Лимит перезапусков | То же, но кластер не запускать 30+ с | `Start request repeated too quickly`, сервис `failed`. Сброс: `sudo systemctl reset-failed calculator` |
 
