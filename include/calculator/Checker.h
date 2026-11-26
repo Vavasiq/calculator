@@ -5,8 +5,8 @@
 namespace calculator {
 
 class Checker {
-public:
-    void check(const Task& task) const;
+  public:
+    void check(const Task &task) const;
 };
 
 } // namespace calculator

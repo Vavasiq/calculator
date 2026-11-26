@@ -7,8 +7,8 @@
 namespace calculator {
 
 class Parser {
-public:
-    Task parse(const std::string& json_str) const;
+  public:
+    Task parse(const std::string &json_str) const;
 };
 
 } // namespace calculator

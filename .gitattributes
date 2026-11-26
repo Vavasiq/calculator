@@ -1,0 +1,4 @@
+# Скрипты пакета и файлы для Linux — всегда с LF, даже при checkout на Windows:
+# с CRLF скрипт падает с "/bin/sh^M: bad interpreter".
+packaging/** text eol=lf
+cmake/** text eol=lf

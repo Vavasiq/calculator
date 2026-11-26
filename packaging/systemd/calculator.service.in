@@ -1,0 +1,31 @@
+# Шаблон: CMake (configure_file) подставляет пути и кладёт итог в build/calculator.service.
+# План: docs/task4-2-systemd.md
+
+[Unit]
+Description=Calculator service
+After=network.target postgresql.service
+Wants=postgresql.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=calculator
+Group=calculator
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/calculator --config @CALCULATOR_CONFIG_DIR@/calculator.json
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+SyslogIdentifier=calculator
+
+# Минимальная защита: сервису нужны только сеть и чтение конфига.
+NoNewPrivileges=yes
+ProtectSystem=strict
+# read-only, а не yes: при yes /home недоступен (EACCES), и libpq при SSL-подключении
+# падает на проверке ~/.postgresql/postgresql.crt вместо того, чтобы считать файл отсутствующим.
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
